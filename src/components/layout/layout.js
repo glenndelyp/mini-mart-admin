@@ -3,7 +3,7 @@ import Header from './header'
 
 export default function Layout({ children }) {
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen" style={{ backgroundColor: '#f8fafc' }}>
       <Sidebar />
       <div className="flex flex-col flex-1 ml-56">
         <Header />
