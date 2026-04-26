@@ -13,9 +13,10 @@ const getStatus = (stock, threshold) => {
 const ITEMS_PER_PAGE = 8
 
 export default function InventoryPage() {
-  const [products,  setProducts]  = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState('')
+ const [products,    setProducts]    = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState('')
+  const [categories,  setCategories]  = useState([])
   const [tab,       setTab]       = useState('stock')
   const [search,    setSearch]    = useState('')
   const [category,  setCategory]  = useState('All')
@@ -51,8 +52,12 @@ export default function InventoryPage() {
     }
   }
 
-  useEffect(() => {
+useEffect(() => {
     fetchProducts()
+    fetch('/api/categories')
+      .then(r => r.json())
+      .then(d => setCategories(d.categories || []))
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -90,8 +95,8 @@ export default function InventoryPage() {
   }
 
   // ── Derived values ────────────────────────────────────────────────────────
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category))).sort()]
-
+// ── Derived values ────────────────────────────────────────────────────────
+  const categoryFilterOptions = ['All', ...Array.from(new Set(products.map(p => p.category))).sort()]
   const filtered = products.filter(p => {
     const matchSearch   = p.name.toLowerCase().includes(search.toLowerCase()) ||
                           p.sku.toLowerCase().includes(search.toLowerCase())
@@ -221,7 +226,7 @@ export default function InventoryPage() {
             onChange={(e) => { setCategory(e.target.value); setPage(1) }}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 outline-none cursor-pointer bg-white"
           >
-            {categories.map((c) => <option key={c}>{c}</option>)}
+            {categoryFilterOptions.map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
 
@@ -528,10 +533,11 @@ export default function InventoryPage() {
       </div>
 
       {/* Modals */}
-      <ProductModal
+     <ProductModal
         isOpen={modalOpen}
         mode={modalMode}
         product={selected}
+        categories={categories}
         onClose={() => setModalOpen(false)}
         onSuccess={handleModalSuccess}
       />

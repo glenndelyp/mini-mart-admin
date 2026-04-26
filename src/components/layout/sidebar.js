@@ -5,6 +5,7 @@ import {
   Package,
   ShoppingBag,
   Truck,
+  Tag,
   CreditCard,
   Settings,
 } from 'lucide-react'
@@ -13,8 +14,9 @@ const navItems = [
   { label: 'Dashboard',            href: '/dashboard', icon: LayoutDashboard },
   { label: 'Inventory Management', href: '/inventory', icon: Package         },
   { label: 'Order Management',     href: '/orders',    icon: ShoppingBag     },
-  { label: 'Supplier Management',  href: '/suppliers', icon: Truck           },
-  { label: 'Payment',              href: '/payment',   icon: CreditCard      },
+ { label: 'Supplier Management',  href: '/suppliers',  icon: Truck          },
+  { label: 'Category',             href: '/categories', icon: Tag            },
+  { label: 'Payment',              href: '/payment',    icon: CreditCard     },
   { label: 'Settings',             href: '/settings',  icon: Settings        },
 ]
 

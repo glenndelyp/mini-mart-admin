@@ -27,7 +27,7 @@ const EMPTY_FORM = {
   image_url:  '',
 }
 
-export default function ProductModal({ isOpen, mode, product, onClose, onSuccess }) {
+export default function ProductModal({ isOpen, mode, product, categories = [], onClose, onSuccess }) {
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [errors,      setErrors]      = useState({})
   const [loading,     setLoading]     = useState(false)
@@ -297,7 +297,7 @@ export default function ProductModal({ isOpen, mode, product, onClose, onSuccess
                 {uploading && (
                   <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center gap-2">
                     <span className="w-6 h-6 border-2 border-slate-200 border-t-green-700 rounded-full animate-spin" />
-                    <span className="text-xs text-slate-500 font-medium">Uploading to Cloudinary…</span>
+                    <span className="text-xs text-slate-500 font-medium">Image Uploading…</span>
                   </div>
                 )}
 
@@ -363,7 +363,9 @@ export default function ProductModal({ isOpen, mode, product, onClose, onSuccess
                 className={inputClass(errors.category)}
               >
                 <option value="">Select category…</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {(categories).filter(c => c.status === 'active').map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
               </select>
             </Field>
             <Field label="Supplier" error={errors.supplier}>
