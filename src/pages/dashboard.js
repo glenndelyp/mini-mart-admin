@@ -1,13 +1,28 @@
+import { useState, useEffect } from 'react'
 import { ShoppingBag, Users, Package, TrendingUp } from 'lucide-react'
 
-const stats = [
-  { label: 'Total Revenue',   value: '₱0', change: '0%', up: true,  icon: TrendingUp,  bg: 'bg-emerald-50',  iconColor: 'text-emerald-700' },
-  { label: 'Total Orders',    value: '0',  change: '0%', up: true,  icon: ShoppingBag, bg: 'bg-sky-50',      iconColor: 'text-sky-600'     },
-  { label: 'Total Customers', value: '0',  change: '0%', up: true,  icon: Users,       bg: 'bg-violet-50',   iconColor: 'text-violet-600'  },
-  { label: 'Low Stock Items', value: '0',  change: '0',  up: false, icon: Package,     bg: 'bg-amber-50',    iconColor: 'text-amber-600'   },
-]
-
 export default function DashboardPage() {
+  const [lowStock, setLowStock] = useState(0)
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then(r => r.json())
+      .then(data => {
+        const count = data.products.filter(
+          p => p.stock > 0 && p.stock <= p.threshold
+        ).length
+        setLowStock(count)
+      })
+      .catch(() => {})
+  }, [])
+
+  const stats = [
+    { label: 'Total Revenue',   value: '₱0',    change: '0%', up: true,  icon: TrendingUp,  bg: 'bg-emerald-50', iconColor: 'text-emerald-700' },
+    { label: 'Total Orders',    value: '0',      change: '0%', up: true,  icon: ShoppingBag, bg: 'bg-sky-50',     iconColor: 'text-sky-600'     },
+    { label: 'Total Customers', value: '0',      change: '0%', up: true,  icon: Users,       bg: 'bg-violet-50',  iconColor: 'text-violet-600'  },
+    { label: 'Low Stock Items', value: lowStock, change: '0',  up: false, icon: Package,     bg: 'bg-amber-50',   iconColor: 'text-amber-600'   },
+  ]
+
   return (
     <div className="space-y-6">
 
