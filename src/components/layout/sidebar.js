@@ -1,22 +1,18 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import {
-  LayoutDashboard,
-  Package,
-  ShoppingBag,
-  Truck,
-  Tag,
-  CreditCard,
-  Settings,
+  LayoutDashboard, Package, ShoppingBag, Truck,
+  Tag, MapPin, CreditCard, Settings,        // 👈 MapPin added
 } from 'lucide-react'
 
 const navItems = [
   { label: 'Dashboard',            href: '/dashboard', icon: LayoutDashboard },
   { label: 'Inventory Management', href: '/inventory', icon: Package         },
   { label: 'Order Management',     href: '/orders',    icon: ShoppingBag     },
- { label: 'Supplier Management',  href: '/suppliers',  icon: Truck          },
-  { label: 'Category',             href: '/categories', icon: Tag            },
-  { label: 'Payment',              href: '/payment',    icon: CreditCard     },
+  { label: 'Supplier Management',  href: '/suppliers', icon: Truck           },
+  { label: 'Category',             href: '/categories',icon: Tag             },
+  { label: 'Locations',            href: '/locations', icon: MapPin          },  // 👈 new
+  { label: 'Payment',              href: '/payment',   icon: CreditCard      },
   { label: 'Settings',             href: '/settings',  icon: Settings        },
 ]
 
