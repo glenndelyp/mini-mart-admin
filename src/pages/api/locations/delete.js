@@ -1,5 +1,5 @@
 // src/pages/api/locations/delete.js
-import { sql } from '../../lib/db'
+import { sql } from '../../../lib/db'
 
 export default async function handler(req, res) {
   if (req.method !== 'DELETE') return res.status(405).json({ message: 'Method not allowed.' })

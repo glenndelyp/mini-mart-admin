@@ -1,5 +1,5 @@
 // src/pages/api/suppliers/create.js
-import { sql } from '../../lib/db'
+import { sql } from '../../../lib/db'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed.' })

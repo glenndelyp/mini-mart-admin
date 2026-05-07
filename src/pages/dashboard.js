@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
 import { ShoppingBag, Users, Package, TrendingUp } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
+
+console.log('Supabase client:', supabase)
+
 
 export default function DashboardPage() {
   const [lowStock, setLowStock] = useState(0)

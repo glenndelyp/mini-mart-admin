@@ -4,7 +4,7 @@
 
 import { IncomingForm } from 'formidable'
 import fs               from 'fs'
-import cloudinary       from '../../lib/cloudinary'
+import cloudinary       from '../../../lib/cloudinary'
 
 // Tell Next.js NOT to parse the body — formidable handles it
 export const config = { api: { bodyParser: false } }

@@ -1,5 +1,5 @@
 // src/pages/api/orders/update.js
-import { sql } from '../../lib/db'
+import { sql } from '../../../lib/db'
 
 const TRANSITIONS = {
   confirm: { next: 'confirmed',  allowed: ['pending']                        },
