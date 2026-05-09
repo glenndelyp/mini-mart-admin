@@ -36,7 +36,8 @@ export default function Header() {
 
   const initials  = admin ? `${admin.first_name?.[0] ?? ''}${admin.last_name?.[0] ?? ''}`.toUpperCase() : 'A'
   const fullName  = admin ? `${admin.first_name} ${admin.last_name}` : 'Admin'
-  const roleLabel = admin?.role === 'superadmin' ? 'Super Admin' : 'Admin'
+  const ROLE_LABEL = { superadmin: 'Super Admin', admin: 'Admin', cashier: 'Cashier' }
+  const roleLabel = ROLE_LABEL[admin?.role?.toLowerCase()] ?? 'Staff'
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-6 h-16 flex items-center justify-between">

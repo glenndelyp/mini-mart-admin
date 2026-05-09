@@ -1,4 +1,4 @@
-// pages/api/auth/login.js
+import bcrypt from 'bcryptjs'
 import { sql } from '../../../lib/db'
 
 export default async function handler(req, res) {
@@ -21,17 +21,22 @@ export default async function handler(req, res) {
 
     const admin = result[0]
 
-    if (admin.password !== password) {
+    if (!admin.is_active) {
+      return res.status(403).json({ message: 'Your account has been deactivated. Contact your administrator.' })
+    }
+
+    const passwordMatch = await bcrypt.compare(password, admin.password)
+    if (!passwordMatch) {
       return res.status(401).json({ message: 'Incorrect password.' })
     }
 
     const { password: _, ...safeAdmin } = admin
 
-    // Store in cookie as a simple JSON string — no extra packages needed
-res.setHeader('Set-Cookie', [
-  `mart_admin=${encodeURIComponent(JSON.stringify(safeAdmin))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 8}`,
-  `mart_admin_auth=1; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 8}`,
-])
+    res.setHeader('Set-Cookie', [
+      `mart_admin=${encodeURIComponent(JSON.stringify(safeAdmin))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 8}`,
+      `mart_admin_auth=1; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 8}`,
+    ])
+
     return res.status(200).json({ user: safeAdmin })
   } catch (err) {
     console.error('[login error]', err)

@@ -102,7 +102,7 @@ export default function LoginPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Invalid credentials.')
       addToast({ type: 'success', message: `Welcome back, ${data.user?.first_name ?? 'Admin'} 👋` })
-      setTimeout(() => router.replace('/dashboard'), 1400)
+      setTimeout(() => router.replace(data.redirectTo || '/dashboard'), 1400)
     } catch (err) {
       addToast({ type: 'error', message: err.message || 'Something went wrong.' })
     } finally {
