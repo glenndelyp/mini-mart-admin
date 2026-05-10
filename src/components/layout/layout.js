@@ -5,7 +5,7 @@ export default function Layout({ children }) {
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: '#f8fafc' }}>
       <Sidebar />
-      <div className="flex flex-col flex-1 ml-56">
+      <div className="flex flex-col flex-1 ml-64">
         <Header />
         <main className="flex-1 p-6">
           {children}

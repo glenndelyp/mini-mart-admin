@@ -15,7 +15,6 @@ const NAV_BY_ROLE = {
     { label: 'Supplier Management',  href: '/suppliers',   icon: Truck           },
     { label: 'Category',             href: '/categories',  icon: Tag             },
     { label: 'Locations',            href: '/locations',   icon: MapPin          },
-    { label: 'Payment',              href: '/payment',     icon: CreditCard      },
     { label: 'Settings',             href: '/settings',    icon: Settings        },
     { label: 'Manage Staff',         href: '/admin/staff', icon: Users           },
   ],
@@ -26,14 +25,12 @@ const NAV_BY_ROLE = {
     { label: 'Supplier Management',  href: '/suppliers',   icon: Truck           },
     { label: 'Category',             href: '/categories',  icon: Tag             },
     { label: 'Locations',            href: '/locations',   icon: MapPin          },
-    { label: 'Payment',              href: '/payment',     icon: CreditCard      },
     { label: 'Settings',             href: '/settings',    icon: Settings        },
     { label: 'Manage Staff',         href: '/admin/staff', icon: Users           },
   ],
   cashier: [
     { label: 'Dashboard',        href: '/dashboard', icon: LayoutDashboard },
     { label: 'Order Management', href: '/orders',    icon: ShoppingBag     },
-    { label: 'Payment',          href: '/payment',   icon: CreditCard      },
   ],
 }
 
@@ -86,7 +83,7 @@ export default function Sidebar() {
   const navItems = NAV_BY_ROLE[role] ?? []
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-56 bg-white border-r border-slate-200 flex flex-col z-50">
+    <aside className="fixed top-0 left-0 h-screen w-64 bg-white border-r border-slate-200 flex flex-col z-50">
 
       {/* Logo */}
       <div className="px-6 py-5 border-b border-slate-100">
@@ -122,7 +119,7 @@ export default function Sidebar() {
                   </span>
                 )}
               </div>
-              <span className="truncate">{label}</span>
+              <span>{label}</span>
             </Link>
           )
         })}

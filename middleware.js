@@ -1,4 +1,3 @@
-// middleware.js (project root)
 import { NextResponse } from 'next/server'
 
 export function middleware(req) {
@@ -7,12 +6,10 @@ export function middleware(req) {
 
   const isPublic = pathname === '/login' || pathname === '/'
 
-  // not logged in → send to login
   if (!auth && !isPublic) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // already logged in → skip login page
   if (auth && isPublic) {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }

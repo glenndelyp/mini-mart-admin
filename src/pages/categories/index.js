@@ -1,6 +1,6 @@
 // src/pages/categories/index.js
 import { useState, useEffect } from 'react'
-import { Search, Plus, Tag } from 'lucide-react'
+import { Search, Plus, Tag, ChevronLeft, ChevronRight } from 'lucide-react'
 import CategoryModal       from '@/components/categories/CategoryModal'
 import CategoryDeleteModal from '@/components/categories/CategoryDeleteModal'
 
@@ -275,7 +275,9 @@ export default function CategoriesPage() {
               Showing {Math.min((page - 1) * ITEMS_PER_PAGE + 1, filtered.length)}–{Math.min(page * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} categories
             </p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="text-sm text-slate-600 hover:text-slate-900 disabled:opacity-40 transition">← Previous</button>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-40 transition">
+                <ChevronLeft size={16} /> Previous
+              </button>
               <div className="flex items-center gap-1">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
                   <button key={p} onClick={() => setPage(p)}
@@ -284,7 +286,9 @@ export default function CategoriesPage() {
                   >{p}</button>
                 ))}
               </div>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="text-sm text-slate-600 hover:text-slate-900 disabled:opacity-40 transition">Next →</button>
+             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 disabled:opacity-40 transition">
+              Next <ChevronRight size={16} />
+            </button>
             </div>
           </div>
         )}

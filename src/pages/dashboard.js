@@ -1,67 +1,51 @@
+// src/pages/dashboard/index.js
 import { useState, useEffect, useRef } from 'react'
-import { ShoppingBag, Users, Package, TrendingUp, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { supabase } from '../lib/supabaseClient'
+import { ShoppingBag, Users, Package, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
+import MiniCalendar, {
+  startOfDay, endOfDay, startOfWeek, endOfWeek,
+  addDays, addWeeks, inRange, formatRangeLabel,
+} from '@/components/layout/MiniCalendar'
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
-function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x }
-function endOfDay(d)   { const x = new Date(d); x.setHours(23,59,59,999); return x }
-function startOfWeek(d){ const x = new Date(d); x.setDate(x.getDate()-x.getDay()); x.setHours(0,0,0,0); return x }
-function endOfWeek(d)  { const x = startOfWeek(d); x.setDate(x.getDate()+6); x.setHours(23,59,59,999); return x }
-function addDays(d,n)  { const x = new Date(d); x.setDate(x.getDate()+n); return x }
-function addWeeks(d,n) { return addDays(d,n*7) }
-function sameDay(a,b)  { return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate() }
-function inRange(dateStr,start,end){ const d=new Date(dateStr); return d>=start&&d<=end }
-function calcChange(curr,prev){
-  if(prev===0) return {label:curr>0?'+100%':'0%',up:curr>=prev}
-  const pct=((curr-prev)/prev)*100
-  return {label:(pct>=0?'+':'')+pct.toFixed(1)+'%',up:pct>=0}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function calcChange(curr, prev) {
+  if (prev === 0) return { label: curr > 0 ? '+100%' : '0%', up: curr >= prev }
+  const pct = ((curr - prev) / prev) * 100
+  return { label: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', up: pct >= 0 }
 }
-function formatPHP(n){ return '₱'+Number(n).toLocaleString('en-PH',{minimumFractionDigits:2}) }
-function formatRangeLabel(mode,date){
-  if(mode==='day') return date.toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})
-  const s=startOfWeek(date), e=endOfWeek(date)
-  if(s.getMonth()===e.getMonth()) return `${s.toLocaleDateString('en-PH',{month:'long'})} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`
-  return `${s.toLocaleDateString('en-PH',{month:'short',day:'numeric'})} – ${e.toLocaleDateString('en-PH',{month:'short',day:'numeric'})}, ${s.getFullYear()}`
+function formatPHP(n) {
+  return '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })
 }
 
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const DAY_NAMES   = ['Su','Mo','Tu','We','Th','Fr','Sa']
-const DAY_LABELS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// ─── Build chart data for a week ─────────────────────────────────────────────
+// ─── Chart builders ───────────────────────────────────────────────────────────
 function buildWeekChartData(orders, weekStart) {
   return DAY_LABELS.map((label, i) => {
     const day = addDays(weekStart, i)
-    const dayStart = startOfDay(day)
-    const dayEnd   = endOfDay(day)
-    const dayOrders = orders.filter(o => inRange(o.created_at, dayStart, dayEnd))
-    const revenue   = dayOrders.filter(o => o.status === 'delivered').reduce((s,o) => s + Number(o.total_amount), 0)
-    const count     = dayOrders.filter(o => o.status !== 'cancelled').length
+    const dayOrders = orders.filter(o => inRange(o.created_at, startOfDay(day), endOfDay(day)))
+    const revenue = dayOrders.filter(o => o.status === 'delivered').reduce((s, o) => s + Number(o.total_amount), 0)
+    const count = dayOrders.filter(o => o.status !== 'cancelled').length
     return { label, revenue, orders: count }
   })
 }
 
-// ─── Build chart data for a day (hourly) ─────────────────────────────────────
 function buildDayChartData(orders, date) {
   return Array.from({ length: 24 }, (_, h) => {
     const start = new Date(date); start.setHours(h, 0, 0, 0)
-    const end   = new Date(date); end.setHours(h, 59, 59, 999)
+    const end = new Date(date); end.setHours(h, 59, 59, 999)
     const hourOrders = orders.filter(o => inRange(o.created_at, start, end))
-    const revenue    = hourOrders.filter(o => o.status === 'delivered').reduce((s,o) => s + Number(o.total_amount), 0)
-    const count      = hourOrders.filter(o => o.status !== 'cancelled').length
-    const label      = h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h-12}pm`
+    const revenue = hourOrders.filter(o => o.status === 'delivered').reduce((s, o) => s + Number(o.total_amount), 0)
+    const count = hourOrders.filter(o => o.status !== 'cancelled').length
+    const label = h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`
     return { label, revenue, orders: count }
-  }).filter((_, h) => {
-    // only show hours 6am–10pm to avoid empty early morning clutter
-    return h >= 6 && h <= 22
-  })
+  }).filter((_, h) => h >= 6 && h <= 22)
 }
 
-// ─── Custom tooltip ───────────────────────────────────────────────────────────
+// ─── Tooltips ─────────────────────────────────────────────────────────────────
 function RevenueTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
@@ -82,86 +66,18 @@ function OrdersTooltip({ active, payload, label }) {
   )
 }
 
-// ─── Mini Calendar ────────────────────────────────────────────────────────────
-function MiniCalendar({ mode, selectedDate, onSelect, onClose }) {
-  const [viewYear,  setViewYear]  = useState(selectedDate.getFullYear())
-  const [viewMonth, setViewMonth] = useState(selectedDate.getMonth())
-
-  const firstDay    = new Date(viewYear, viewMonth, 1).getDay()
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
-  const cells = []
-  for (let i = 0; i < firstDay; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(viewYear, viewMonth, d))
-
-  function prevMonth() { if(viewMonth===0){setViewYear(y=>y-1);setViewMonth(11)}else setViewMonth(m=>m-1) }
-  function nextMonth() { if(viewMonth===11){setViewYear(y=>y+1);setViewMonth(0)}else setViewMonth(m=>m+1) }
-  function isSelected(d) {
-    if (!d) return false
-    if (mode==='day') return sameDay(d, selectedDate)
-    return d >= startOfWeek(selectedDate) && d <= endOfWeek(selectedDate)
-  }
-  function isToday(d) { return d && sameDay(d, new Date()) }
-
-  return (
-    <div className="absolute top-full right-0 mt-2 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 w-72">
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={prevMonth} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
-          <ChevronLeft size={16} className="text-slate-500" />
-        </button>
-        <span className="text-sm font-bold text-slate-800">{MONTH_NAMES[viewMonth]} {viewYear}</span>
-        <div className="flex items-center gap-1">
-          <button onClick={nextMonth} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
-            <ChevronRight size={16} className="text-slate-500" />
-          </button>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition-colors ml-1">
-            <X size={14} className="text-slate-400" />
-          </button>
-        </div>
-      </div>
-      <div className="grid grid-cols-7 mb-1">
-        {DAY_NAMES.map(d => (
-          <div key={d} className="text-center text-xs font-semibold text-slate-400 py-1">{d}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-y-0.5">
-        {cells.map((d, i) => {
-          if (!d) return <div key={`e-${i}`} />
-          const selected = isSelected(d)
-          const today    = isToday(d)
-          return (
-            <button key={i} onClick={() => { onSelect(d); onClose() }}
-              className={`text-xs py-1.5 rounded-lg font-medium transition-all ${
-                selected ? 'bg-slate-800 text-white'
-                : today   ? 'bg-emerald-50 text-emerald-700 font-bold'
-                :           'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {d.getDate()}
-            </button>
-          )
-        })}
-      </div>
-      <div className="mt-3 pt-3 border-t border-slate-100">
-        <button onClick={() => { onSelect(new Date()); onClose() }}
-          className="w-full text-xs font-semibold text-emerald-700 hover:text-emerald-800 py-1 rounded-lg hover:bg-emerald-50 transition-colors">
-          Go to today
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [mode, setMode]             = useState('week')
+  const [mode, setMode] = useState('week')
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [showCal, setShowCal]       = useState(false)
+  const [showCal, setShowCal] = useState(false)
   const calRef = useRef(null)
 
-  const [orders,   setOrders]   = useState([])
+  const [orders, setOrders] = useState([])
   const [products, setProducts] = useState([])
-  const [loading,  setLoading]  = useState(true)
+  const [loading, setLoading] = useState(true)
 
+  // Close calendar on outside click
   useEffect(() => {
     function handleClick(e) {
       if (calRef.current && !calRef.current.contains(e.target)) setShowCal(false)
@@ -170,6 +86,7 @@ export default function DashboardPage() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  // Fetch data
   useEffect(() => {
     async function load() {
       try {
@@ -188,17 +105,17 @@ export default function DashboardPage() {
     load()
   }, [])
 
-  // ── Ranges ────────────────────────────────────────────────────────────────
-  const currStart = mode === 'day' ? startOfDay(selectedDate)  : startOfWeek(selectedDate)
-  const currEnd   = mode === 'day' ? endOfDay(selectedDate)    : endOfWeek(selectedDate)
-  const prevStart = mode === 'day' ? startOfDay(addDays(selectedDate,-1))  : startOfWeek(addWeeks(selectedDate,-1))
-  const prevEnd   = mode === 'day' ? endOfDay(addDays(selectedDate,-1))    : endOfWeek(addWeeks(selectedDate,-1))
+  // ── Date ranges ──────────────────────────────────────────────────────────────
+  const currStart = mode === 'day' ? startOfDay(selectedDate) : startOfWeek(selectedDate)
+  const currEnd   = mode === 'day' ? endOfDay(selectedDate)   : endOfWeek(selectedDate)
+  const prevStart = mode === 'day' ? startOfDay(addDays(selectedDate, -1))  : startOfWeek(addWeeks(selectedDate, -1))
+  const prevEnd   = mode === 'day' ? endOfDay(addDays(selectedDate, -1))    : endOfWeek(addWeeks(selectedDate, -1))
 
   const currOrders = orders.filter(o => inRange(o.created_at, currStart, currEnd))
   const prevOrders = orders.filter(o => inRange(o.created_at, prevStart, prevEnd))
 
-  const revCurr = currOrders.filter(o => o.status==='delivered').reduce((s,o)=>s+Number(o.total_amount),0)
-  const revPrev = prevOrders.filter(o => o.status==='delivered').reduce((s,o)=>s+Number(o.total_amount),0)
+  const revCurr   = currOrders.filter(o => o.status === 'delivered').reduce((s, o) => s + Number(o.total_amount), 0)
+  const revPrev   = prevOrders.filter(o => o.status === 'delivered').reduce((s, o) => s + Number(o.total_amount), 0)
   const revChange = calcChange(revCurr, revPrev)
 
   const activeCurr = currOrders.filter(o => o.status !== 'cancelled')
@@ -212,15 +129,14 @@ export default function DashboardPage() {
   const lowStock = products.filter(p => p.stock > 0 && p.stock <= p.threshold).length
   const outStock = products.filter(p => p.stock === 0).length
 
-  // ── Chart data ────────────────────────────────────────────────────────────
-  const chartData = mode === 'week'
+  // ── Chart data ───────────────────────────────────────────────────────────────
+  const chartData      = mode === 'week'
     ? buildWeekChartData(orders, startOfWeek(selectedDate))
     : buildDayChartData(orders, selectedDate)
-
   const hasRevenueData = chartData.some(d => d.revenue > 0)
   const hasOrderData   = chartData.some(d => d.orders > 0)
 
-  // ── Top products ──────────────────────────────────────────────────────────
+  // ── Top products ─────────────────────────────────────────────────────────────
   const productSales = {}
   for (const order of currOrders) {
     for (const item of order.items ?? []) {
@@ -228,17 +144,14 @@ export default function DashboardPage() {
       productSales[item.product_name] += item.quantity
     }
   }
-  const topProducts = Object.entries(productSales)
-    .sort((a,b) => b[1]-a[1]).slice(0,5)
-    .map(([name,qty]) => ({name,qty}))
-
+  const topProducts  = Object.entries(productSales).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, qty]) => ({ name, qty }))
   const recentOrders = currOrders.slice(0, 5)
 
   const stats = [
-    { label:'Total Revenue',   value:formatPHP(revCurr),          change:revChange.label,  up:revChange.up,  icon:TrendingUp,  bg:'bg-emerald-50', iconColor:'text-emerald-700' },
-    { label:'Total Orders',    value:activeCurr.length.toString(), change:ordChange.label,  up:ordChange.up,  icon:ShoppingBag, bg:'bg-sky-50',     iconColor:'text-sky-600'     },
-    { label:'Total Customers', value:custCurr.toString(),          change:custChange.label, up:custChange.up, icon:Users,       bg:'bg-violet-50',  iconColor:'text-violet-600'  },
-    { label:'Low Stock Items', value:lowStock,                     change:`${outStock} out of stock`, up:false, icon:Package, bg:'bg-amber-50',   iconColor:'text-amber-600'   },
+    { label: 'Total Revenue',   value: formatPHP(revCurr),          change: revChange.label,  up: revChange.up,  icon: TrendingUp,  bg: 'bg-emerald-50', iconColor: 'text-emerald-700' },
+    { label: 'Total Orders',    value: activeCurr.length.toString(), change: ordChange.label,  up: ordChange.up,  icon: ShoppingBag, bg: 'bg-sky-50',     iconColor: 'text-sky-600'     },
+    { label: 'Total Customers', value: custCurr.toString(),          change: custChange.label, up: custChange.up, icon: Users,       bg: 'bg-violet-50',  iconColor: 'text-violet-600'  },
+    { label: 'Low Stock Items', value: lowStock,                     change: `${outStock} out of stock`, up: false, icon: Package,  bg: 'bg-amber-50',   iconColor: 'text-amber-600'   },
   ]
 
   const statusColor = (s) => ({
@@ -249,33 +162,49 @@ export default function DashboardPage() {
   }[s] ?? 'bg-slate-100 text-slate-600')
 
   function navigate(dir) {
-    setSelectedDate(d => mode==='day' ? addDays(d,dir) : addWeeks(d,dir))
+    setSelectedDate(d => mode === 'day' ? addDays(d, dir) : addWeeks(d, dir))
   }
 
   const compareLabel  = mode === 'day' ? 'vs yesterday' : 'vs last week'
-  const chartTitle    = mode === 'day' ? 'Today\'s Revenue' : 'Weekly Revenue'
+  const chartTitle    = mode === 'day' ? "Today's Revenue"    : 'Weekly Revenue'
   const chartSubtitle = mode === 'day' ? 'Hourly revenue breakdown' : 'Daily revenue this week'
-  const trendTitle    = mode === 'day' ? 'Today\'s Orders' : 'Order Trends'
+  const trendTitle    = mode === 'day' ? "Today's Orders"     : 'Order Trends'
   const trendSubtitle = mode === 'day' ? 'Hourly order volume' : 'Daily order volume this week'
+
+  // ── Today's date values ──────────────────────────────────────────────────────
+  const today = new Date()
 
   return (
     <div className="space-y-6">
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Welcome back — here's what's happening today.</p>
+         <p className="text-sm text-slate-400 mt-0.5 flex items-center gap-2">
+            Welcome back — here's what's happening today.
+            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-0.5 text-xs font-medium text-slate-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+            </span>
+          </p>
         </div>
+
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-slate-100 rounded-lg p-1 gap-1">
-            {['day','week'].map(m => (
-              <button key={m} onClick={() => setMode(m)}
+            {['day', 'week'].map(m => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
                 className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-all capitalize ${
-                  mode===m ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}>{m}</button>
+                  mode === m ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {m}
+              </button>
             ))}
           </div>
+
           <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
             <button onClick={() => navigate(-1)} className="px-2 py-2 hover:bg-slate-50 transition-colors border-r border-slate-200">
               <ChevronLeft size={15} className="text-slate-500" />
@@ -287,32 +216,48 @@ export default function DashboardPage() {
               <ChevronRight size={15} className="text-slate-500" />
             </button>
           </div>
+
           <div ref={calRef} className="relative">
-            <button onClick={() => setShowCal(v => !v)}
+            <button
+              onClick={() => setShowCal(v => !v)}
               className={`p-2 rounded-lg border transition-all ${
-                showCal ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}>
-              <Calendar size={15} />
+                showCal
+                  ? 'bg-slate-800 border-slate-800 text-white'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {/* calendar icon inline so we don't need lucide Calendar import here */}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8"  y1="2" x2="8"  y2="6" />
+                <line x1="3"  y1="10" x2="21" y2="10" />
+              </svg>
             </button>
             {showCal && (
-              <MiniCalendar mode={mode} selectedDate={selectedDate}
-                onSelect={setSelectedDate} onClose={() => setShowCal(false)} />
+              <MiniCalendar
+                mode={mode}
+                selectedDate={selectedDate}
+                onSelect={setSelectedDate}
+                onClose={() => setShowCal(false)}
+                align="right"
+              />
             )}
           </div>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* ── Stats ── */}
       <div className="grid grid-cols-4 gap-5">
         {loading
-          ? Array(4).fill(0).map((_,i) => (
+          ? Array(4).fill(0).map((_, i) => (
               <div key={i} className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse">
                 <div className="w-10 h-10 rounded-lg bg-slate-100 mb-3" />
                 <div className="h-3 w-24 bg-slate-100 rounded mb-2" />
                 <div className="h-7 w-16 bg-slate-100 rounded" />
               </div>
             ))
-          : stats.map((s) => {
+          : stats.map(s => {
               const Icon = s.icon
               return (
                 <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-5">
@@ -330,21 +275,18 @@ export default function DashboardPage() {
         }
       </div>
 
-      {/* Charts */}
+      {/* ── Charts ── */}
       <div className="grid grid-cols-3 gap-5">
-
-        {/* Revenue chart */}
         <div className="col-span-2 bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-bold text-slate-800">{chartTitle}</h2>
               <p className="text-xs text-slate-400 mt-0.5">{chartSubtitle}</p>
             </div>
-            <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ backgroundColor:'#f0fdf4', color:'#14532d' }}>
+            <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ backgroundColor: '#f0fdf4', color: '#14532d' }}>
               {formatPHP(revCurr)}
             </span>
           </div>
-
           {loading ? (
             <div className="h-48 bg-slate-50 rounded-xl animate-pulse" />
           ) : !hasRevenueData ? (
@@ -355,32 +297,30 @@ export default function DashboardPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={192}>
-              <AreaChart data={chartData} margin={{ top:4, right:4, left:0, bottom:0 }}>
+              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#14532d" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#14532d" stopOpacity={0}    />
+                    <stop offset="95%" stopColor="#14532d" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize:11, fill:'#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize:11, fill:'#94a3b8' }} axisLine={false} tickLine={false}
-                  tickFormatter={v => v >= 1000 ? `₱${(v/1000).toFixed(1)}k` : `₱${v}`} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                  tickFormatter={v => v >= 1000 ? `₱${(v / 1000).toFixed(1)}k` : `₱${v}`} />
                 <Tooltip content={<RevenueTooltip />} />
                 <Area type="monotone" dataKey="revenue" stroke="#14532d" strokeWidth={2}
-                  fill="url(#revenueGrad)" dot={{ fill:'#14532d', r:3 }} activeDot={{ r:5 }} />
+                  fill="url(#revenueGrad)" dot={{ fill: '#14532d', r: 3 }} activeDot={{ r: 5 }} />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Order trends chart */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="mb-4">
             <h2 className="text-sm font-bold text-slate-800">{trendTitle}</h2>
             <p className="text-xs text-slate-400 mt-0.5">{trendSubtitle}</p>
           </div>
-
           {loading ? (
             <div className="h-48 bg-slate-50 rounded-xl animate-pulse" />
           ) : !hasOrderData ? (
@@ -391,42 +331,40 @@ export default function DashboardPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={192}>
-              <BarChart data={chartData} margin={{ top:4, right:4, left:0, bottom:0 }}>
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize:11, fill:'#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize:11, fill:'#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip content={<OrdersTooltip />} />
-                <Bar dataKey="orders" fill="#0ea5e9" radius={[4,4,0,0]} maxBarSize={32} />
+                <Bar dataKey="orders" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
       </div>
 
-      {/* Bottom row */}
+      {/* ── Bottom row ── */}
       <div className="grid grid-cols-3 gap-5">
-
-        {/* Recent orders */}
         <div className="col-span-2 bg-white rounded-xl border border-slate-200">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <h2 className="text-sm font-bold text-slate-800">Recent Orders</h2>
-            <a href="/orders" className="text-xs font-medium hover:underline" style={{ color:'#14532d' }}>View all →</a>
+            <a href="/orders" className="text-xs font-medium hover:underline" style={{ color: '#14532d' }}>View all →</a>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="text-xs" style={{ backgroundColor:'#1e293b', color:'#f8fafc' }}>
-                <th className="text-left px-5 py-3 font-medium">Customer</th>
-                <th className="text-left px-5 py-3 font-medium">Product</th>
-                <th className="text-left px-5 py-3 font-medium">Order ID</th>
-                <th className="text-left px-5 py-3 font-medium">Amount</th>
-                <th className="text-left px-5 py-3 font-medium">Status</th>
+              <tr className="bg-slate-50 text-slate-500 text-[11px] font-semibold uppercase tracking-wide border-b border-slate-100">
+                <th className="text-left px-5 py-3">Customer</th>
+                <th className="text-left px-5 py-3">Product</th>
+                <th className="text-left px-5 py-3">Order ID</th>
+                <th className="text-left px-5 py-3">Amount</th>
+                <th className="text-left px-5 py-3">Status</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                Array(3).fill(0).map((_,i) => (
+                Array(3).fill(0).map((_, i) => (
                   <tr key={i} className="border-t border-slate-100">
-                    {Array(5).fill(0).map((_,j) => (
+                    {Array(5).fill(0).map((_, j) => (
                       <td key={j} className="px-5 py-3">
                         <div className="h-3 bg-slate-100 rounded animate-pulse w-20" />
                       </td>
@@ -465,15 +403,14 @@ export default function DashboardPage() {
           </table>
         </div>
 
-        {/* Top products */}
         <div className="bg-white rounded-xl border border-slate-200">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <h2 className="text-sm font-bold text-slate-800">Top Products</h2>
-            <a href="/inventory" className="text-xs font-medium hover:underline" style={{ color:'#14532d' }}>View all →</a>
+            <a href="/inventory" className="text-xs font-medium hover:underline" style={{ color: '#14532d' }}>View all →</a>
           </div>
           {loading ? (
             <div className="p-5 space-y-3">
-              {Array(4).fill(0).map((_,i) => (
+              {Array(4).fill(0).map((_, i) => (
                 <div key={i} className="h-4 bg-slate-100 rounded animate-pulse" />
               ))}
             </div>
@@ -485,11 +422,11 @@ export default function DashboardPage() {
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {topProducts.map((p,i) => (
+              {topProducts.map((p, i) => (
                 <li key={p.name} className="flex items-center justify-between px-5 py-3">
                   <div className="flex items-center gap-3">
                     <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center">
-                      {i+1}
+                      {i + 1}
                     </span>
                     <span className="text-sm text-slate-700 truncate max-w-[140px]">{p.name}</span>
                   </div>
@@ -500,6 +437,7 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
     </div>
   )
 }
