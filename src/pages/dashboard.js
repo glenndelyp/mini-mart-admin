@@ -174,7 +174,7 @@ export default function DashboardPage() {
   // ── Today's date values ──────────────────────────────────────────────────────
   const today = new Date()
 
-  return (
+  return ( 
     <div className="space-y-6">
 
       {/* ── Header ── */}

@@ -81,6 +81,8 @@ export default function OrdersPage() {
   const [checklistOrder, setChecklistOrder] = useState(null)
   const [actionModal,    setActionModal]    = useState(null)
   const [deleteModal,    setDeleteModal]    = useState(null)
+  const [fulfillmentMode, setFulfillmentMode] = useState('pickup')
+
 
   // ── Date range filter ─────────────────────────────────────────────────────
   const [rangeStart, setRangeStart] = useState(null)
@@ -151,6 +153,13 @@ export default function OrdersPage() {
     }
   }
 
+useEffect(() => {
+  fetch('/api/settings')
+    .then(r => r.json())
+    .then(data => { if (data?.value) setFulfillmentMode(data.value) })
+    .catch(() => {}) 
+}, [])
+
   useEffect(() => { fetchOrders() }, [])
 
   const handleAction = ({ type, order }) => {
@@ -212,6 +221,21 @@ export default function OrdersPage() {
       orders.filter(o => (key === 'all' || o.status === key) && matchesDate(o)).length
     ])
   )
+
+  {fulfillmentMode === 'pickup' && (
+  <div className="flex items-center gap-2.5 mb-4 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+    <Truck size={14} className="shrink-0" />
+    <span>
+      Delivery is <strong>disabled</strong> — all orders are pick-up only.
+    </span>
+    
+     <a href="/settings"
+      className="ml-auto text-xs font-semibold underline whitespace-nowrap"
+    >
+      Change in Settings →
+    </a>
+  </div>
+)}
 
   // ── Stat cards ─────────────────────────────────────────────────────────────
   // "Total Orders" excludes cancelled — matches dashboard behaviour

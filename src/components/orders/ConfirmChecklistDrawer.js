@@ -23,8 +23,7 @@ export default function ConfirmChecklistDrawer({ order, onClose, onConfirmed }) 
     try {
       setLoading(true)
       setError('')
-      const res  = await fetch(`/api/orders/${order.id}/status`, {
-        method:  'PATCH',
+      const res  = await fetch(`/api/orders/${order.id}`, { method: 'PATCH', 
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ status: 'confirmed', notes }),
       })
