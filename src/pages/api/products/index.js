@@ -6,7 +6,7 @@ export default async function handler(req, res) {
 
   try {
     const products = await sql`
-      SELECT id, name, sku, category, stock, unit, unit_price, threshold, supplier, image_url, created_at
+      SELECT id, name, sku, category, stock, unit, unit_price, cost, threshold, supplier, image_url, created_at
       FROM products
       ORDER BY created_at DESC
     `

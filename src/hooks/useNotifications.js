@@ -1,13 +1,13 @@
 // src/hooks/useNotifications.js
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+
+const POLL_INTERVAL = 60_000 // refetch every 60 seconds
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState([])
   const [loading,       setLoading]       = useState(true)
   const [unreadCount,   setUnreadCount]   = useState(0)
 
-  // Track seen IDs in localStorage so badge clears across refreshes
   const seenIdsRef = useRef(new Set())
 
   useEffect(() => {
@@ -18,7 +18,6 @@ export function useNotifications() {
     } catch {}
   }, [])
 
-  // ── Fetch from our API route (which uses service role key safely) ────────
   const fetchNotifications = useCallback(async () => {
     try {
       const res  = await fetch('/api/notifications')
@@ -28,7 +27,6 @@ export function useNotifications() {
 
       setNotifications(list)
 
-      // Count notifications the user hasn't seen yet
       const unseen = list.filter(n => !seenIdsRef.current.has(n.id)).length
       setUnreadCount(unseen)
     } catch (err) {
@@ -38,52 +36,22 @@ export function useNotifications() {
     }
   }, [])
 
-  // ── Initial fetch ────────────────────────────────────────────────────────
+  // Initial fetch
   useEffect(() => {
     fetchNotifications()
   }, [fetchNotifications])
 
-  // ── Supabase Realtime subscriptions ─────────────────────────────────────
+  // Poll every 60s instead of Supabase realtime
   useEffect(() => {
-    // Listen for any UPDATE on inventory (e.g. quantity changes)
-    const inventoryChannel = supabase
-      .channel('notif-inventory-watch')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'inventory' },
-        () => fetchNotifications()
-      )
-      .subscribe()
-
-    // Listen for INSERT or UPDATE on orders (new orders, status changes)
-    const ordersChannel = supabase
-      .channel('notif-orders-watch')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        () => fetchNotifications()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        () => fetchNotifications()
-      )
-      .subscribe()
-
-    // Cleanup on unmount
-    return () => {
-      supabase.removeChannel(inventoryChannel)
-      supabase.removeChannel(ordersChannel)
-    }
+    const interval = setInterval(fetchNotifications, POLL_INTERVAL)
+    return () => clearInterval(interval)
   }, [fetchNotifications])
 
-  // ── Mark all as read ─────────────────────────────────────────────────────
   const markAllRead = useCallback(() => {
-    const allIds = notifications.map(n => n.id)
+    const allIds  = notifications.map(n => n.id)
     const newSeen = new Set([...seenIdsRef.current, ...allIds])
     seenIdsRef.current = newSeen
     setUnreadCount(0)
-
     try {
       localStorage.setItem('mart_seen_notifs', JSON.stringify([...newSeen]))
     } catch {}

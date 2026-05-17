@@ -4,9 +4,9 @@ import { sql } from '../../../lib/db'
 export default async function handler(req, res) {
   if (req.method !== 'PUT') return res.status(405).json({ message: 'Method not allowed.' })
 
-  const { id, name, sku, category, stock, unit, unit_price, threshold, supplier, image_url } = req.body
+  const { id, name, sku, category, stock, unit, unit_price, cost, threshold, supplier, image_url } = req.body
 
-  if (!id || !name || !sku || !category || stock === undefined || !unit || unit_price === undefined || threshold === undefined) {
+  if (!id || !name || !sku || !category || stock === undefined || !unit || unit_price === undefined || cost === undefined || threshold === undefined) {
     return res.status(400).json({ message: 'All required fields must be filled.' })
   }
 
@@ -22,11 +22,12 @@ export default async function handler(req, res) {
           stock      = ${Number(stock)},
           unit       = ${unit},
           unit_price = ${Number(unit_price)},
+          cost       = ${Number(cost)},
           threshold  = ${Number(threshold)},
           supplier   = ${supplier || null},
           image_url  = ${image_url || null}
       WHERE id = ${id}
-      RETURNING id, name, sku, category, stock, unit, unit_price, threshold, supplier, image_url, created_at
+      RETURNING id, name, sku, category, stock, unit, unit_price, cost, threshold, supplier, image_url, created_at
     `
     if (result.length === 0) return res.status(404).json({ message: 'Product not found.' })
     return res.status(200).json({ product: result[0] })

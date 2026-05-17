@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Bulk image updater
+update_log.json
+scripts/image_updater.js

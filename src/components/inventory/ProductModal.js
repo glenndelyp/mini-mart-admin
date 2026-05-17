@@ -1,18 +1,11 @@
 // src/components/inventory/ProductModal.js
 import { useState, useEffect, useRef } from 'react'
-import { X, Package, UploadCloud, Trash2 } from 'lucide-react'
+import { X, Package, UploadCloud, Trash2, Link } from 'lucide-react'
 
 const UNITS = [
   'pcs', 'kg', 'g', 'lbs', 'oz',
   'L', 'mL', 'box', 'pack', 'bag',
   'bottle', 'can', 'bundle', 'dozen', 'tray',
-]
-
-const CATEGORIES = [
-  'Beverages', 'Dairy', 'Frozen', 'Grains & Pasta',
-  'Meat & Poultry', 'Produce', 'Seafood', 'Snacks',
-  'Condiments', 'Bakery', 'Canned Goods', 'Personal Care',
-  'Cleaning', 'Others',
 ]
 
 const EMPTY_FORM = {
@@ -22,6 +15,7 @@ const EMPTY_FORM = {
   stock:      '',
   unit:       '',
   unit_price: '',
+  cost:       '',
   threshold:  '',
   supplier:   '',
   image_url:  '',
@@ -35,14 +29,17 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
   const [suppliers,   setSuppliers]   = useState([])
   const [suppLoading, setSuppLoading] = useState(false)
 
-  // Image upload state
-  const [imageFile,    setImageFile]    = useState(null)   // raw File object from picker
-  const [imagePreview, setImagePreview] = useState('')     // local blob URL for instant preview
-  const [uploading,    setUploading]    = useState(false)  // true while talking to Cloudinary
+  // Image state
+  const [imageTab,     setImageTab]     = useState('upload') // 'upload' | 'url'
+  const [imageFile,    setImageFile]    = useState(null)
+  const [imagePreview, setImagePreview] = useState('')
+  const [urlInput,     setUrlInput]     = useState('')
+  const [urlError,     setUrlError]     = useState('')
+  const [uploading,    setUploading]    = useState(false)
   const [uploadError,  setUploadError]  = useState('')
   const fileInputRef = useRef(null)
 
-  // ── Fetch active suppliers for dropdown ──────────────────────────────────
+  // ── Fetch suppliers ──────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return
     const fetchSuppliers = async () => {
@@ -51,20 +48,22 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
         const res  = await fetch('/api/suppliers')
         const data = await res.json()
         if (res.ok) setSuppliers((data.suppliers || []).filter(s => s.status === 'active'))
-      } catch { /* silently fail — dropdown stays empty */ } finally {
+      } catch { } finally {
         setSuppLoading(false)
       }
     }
     fetchSuppliers()
   }, [isOpen])
 
-  // ── Populate / reset form when modal opens ───────────────────────────────
+  // ── Populate / reset form ────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return
     setApiError('')
     setUploadError('')
+    setUrlError('')
     setErrors({})
     setImageFile(null)
+    setUrlInput('')
 
     if (mode === 'edit' && product) {
       setForm({
@@ -74,14 +73,22 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
         stock:      product.stock       ?? '',
         unit:       product.unit        || '',
         unit_price: product.unit_price  ?? '',
+        cost:       product.cost        ?? '',
         threshold:  product.threshold   ?? '',
         supplier:   product.supplier    || '',
         image_url:  product.image_url   || '',
       })
       setImagePreview(product.image_url || '')
+      if (product.image_url) {
+        setUrlInput(product.image_url)
+        setImageTab('url')   // ← show URL tab so the preview renders in the right context
+      } else {
+        setImageTab('upload')
+      }
     } else {
       setForm(EMPTY_FORM)
       setImagePreview('')
+      setImageTab('upload')
     }
   }, [isOpen, mode, product])
 
@@ -91,29 +98,44 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
     setApiError('')
   }
 
-  // ── File picker handler ──────────────────────────────────────────────────
+  // ── File picker ──────────────────────────────────────────────────
   const handleFilePick = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadError('')
-
-    // ── Client-side file size limit ──────────────────────────────────────
-    // Change MAX_MB to allow larger or smaller uploads from the browser.
-    // The Cloudinary free plan supports up to 10 MB per image.
-    // Formula: MAX_MB × 1024 × 1024
-    // ─────────────────────────────────────────────────────────────────────
     const MAX_MB = 5
     if (file.size > MAX_MB * 1024 * 1024) {
       setUploadError(`File too large. Maximum allowed size is ${MAX_MB} MB.`)
       return
     }
-
     setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))  // instant local preview before upload
-    set('image_url', '')                         // clear old URL; will be set after upload
+    setImagePreview(URL.createObjectURL(file))
+    set('image_url', '')
   }
 
-  // ── Upload to Cloudinary via API route ───────────────────────────────────
+  // ── Paste URL handler ────────────────────────────────────────────
+  const handleUrlApply = () => {
+    setUrlError('')
+    if (!urlInput.trim()) {
+      setUrlError('Please enter an image URL.')
+      return
+    }
+    try {
+      new URL(urlInput.trim()) // validate URL format
+    } catch {
+      setUrlError('Invalid URL. Please enter a valid image URL.')
+      return
+    }
+    setImagePreview(urlInput.trim())
+    set('image_url', urlInput.trim())
+    setImageFile(null) // clear any file
+  }
+
+  const handleUrlKeyDown = (e) => {
+    if (e.key === 'Enter') handleUrlApply()
+  }
+
+  // ── Upload file to Cloudinary ────────────────────────────────────
   const uploadToCloudinary = async (file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -133,16 +155,18 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
     }
   }
 
-  // ── Remove chosen image ──────────────────────────────────────────────────
   const handleRemoveImage = () => {
     setImageFile(null)
     setImagePreview('')
     setUploadError('')
+    setUrlError('')
+    setUrlInput('')
     set('image_url', '')
+    setImageTab('upload')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  // ── Validation ───────────────────────────────────────────────────────────
+  // ── Validation ───────────────────────────────────────────────────
   const validate = () => {
     const e = {}
     if (!form.name.trim())      e.name       = 'Product name is required.'
@@ -155,6 +179,8 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
     if (form.unit_price === '') e.unit_price = 'Unit price is required.'
     else if (isNaN(Number(form.unit_price)) || Number(form.unit_price) < 0)
                                 e.unit_price = 'Unit price must be a valid non-negative number.'
+    if (form.cost !== '' && (isNaN(Number(form.cost)) || Number(form.cost) < 0))
+                                e.cost       = 'Cost must be a valid non-negative number.'
     if (form.threshold === '')  e.threshold  = 'Low stock threshold is required.'
     else if (isNaN(Number(form.threshold)) || Number(form.threshold) < 0)
                                 e.threshold  = 'Threshold must be a valid non-negative number.'
@@ -162,7 +188,7 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
     return Object.keys(e).length === 0
   }
 
-  // ── Submit ───────────────────────────────────────────────────────────────
+  // ── Submit ───────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!validate()) return
     setLoading(true)
@@ -171,10 +197,10 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
     try {
       let finalImageUrl = form.image_url
 
-      // If admin picked a new local file, upload it to Cloudinary first
+      // If a file was picked, upload it to Cloudinary
       if (imageFile) {
         const uploaded = await uploadToCloudinary(imageFile)
-        if (!uploaded) { setLoading(false); return }   // upload failed — abort
+        if (!uploaded) { setLoading(false); return }
         finalImageUrl = uploaded
       }
 
@@ -214,7 +240,7 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
     >
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#f0fdf4' }}>
@@ -234,83 +260,135 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
           </button>
         </div>
 
-        {/* ── Body (scrollable) ── */}
+        {/* Body */}
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
 
-          {/* API error banner */}
           {apiError && (
             <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
               {apiError}
             </div>
           )}
 
-          {/* ── Image upload zone ── */}
+          {/* ── Image Section ─────────────────────────────────────── */}
           <Field label="Product Image">
 
-            {/* Hidden native file input — triggered by the button/zone below */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFilePick}
-            />
+            {/* Tab switcher: Upload / URL */}
+            {!hasImage && (
+              <div className="flex gap-1 mb-3 bg-slate-100 rounded-lg p-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => { setImageTab('upload'); setUrlError('') }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                    imageTab === 'upload'
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <UploadCloud size={13} /> Upload File
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setImageTab('url'); setUploadError('') }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                    imageTab === 'url'
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Link size={13} /> Paste URL
+                </button>
+              </div>
+            )}
 
-            {!hasImage ? (
-              /* Empty state — clickable drop zone */
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition flex flex-col items-center justify-center gap-2 cursor-pointer"
-              >
-                <UploadCloud size={24} className="text-slate-400" />
-                <span className="text-sm text-slate-500 font-medium">Click to upload image</span>
-                {/* ── Hint text ────────────────────────────────────────────
-                    Update the text below to match your MAX_MB and formats.
-                    ──────────────────────────────────────────────────────── */}
-                <span className="text-xs text-slate-400">JPG, PNG, WEBP · Max 5 MB</span>
-              </button>
-            ) : (
-              /* Preview card */
+            {/* Upload tab */}
+            {imageTab === 'upload' && !hasImage && (
+              <>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFilePick} />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition flex flex-col items-center justify-center gap-2 cursor-pointer"
+                >
+                  <UploadCloud size={24} className="text-slate-400" />
+                  <span className="text-sm text-slate-500 font-medium">Click to upload image</span>
+                  <span className="text-xs text-slate-400">JPG, PNG, WEBP · Max 5 MB</span>
+                </button>
+                {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
+              </>
+            )}
+
+            {/* URL tab */}
+            {imageTab === 'url' && !hasImage && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://example.com/product-image.jpg"
+                    value={urlInput}
+                    onChange={e => { setUrlInput(e.target.value); setUrlError('') }}
+                    onKeyDown={handleUrlKeyDown}
+                    className="flex-1 h-10 px-3 text-sm rounded-lg border border-slate-200 outline-none bg-slate-50 text-slate-800 placeholder-slate-400 focus:border-green-600 focus:ring-2 focus:ring-green-50 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleUrlApply}
+                    className="px-4 py-2 text-sm font-semibold text-white rounded-lg transition hover:opacity-90"
+                    style={{ backgroundColor: '#14532d' }}
+                  >
+                    Apply
+                  </button>
+                </div>
+                {urlError && <p className="text-xs text-red-500">{urlError}</p>}
+                <p className="text-xs text-slate-400">
+                  Paste a direct image URL and click Apply to preview it.
+                </p>
+              </div>
+            )}
+
+            {/* Image preview (shared for both upload and URL) */}
+            {hasImage && (
               <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-
-                {/*
-                  ┌─────────────────────────────────────────────────────────┐
-                  │  IMAGE SIZE IN THE MODAL PREVIEW                        │
-                  │                                                         │
-                  │  Change `h-40` on the <img> below to resize:           │
-                  │    h-24  →  96px  (small)                               │
-                  │    h-32  → 128px  (medium-small)                        │
-                  │    h-40  → 160px  (medium)   ← current                 │
-                  │    h-48  → 192px  (medium-large)                        │
-                  │    h-56  → 224px  (large)                               │
-                  │    h-64  → 256px  (extra-large)                         │
-                  └─────────────────────────────────────────────────────────┘
-                */}
                 <img
                   src={imagePreview}
                   alt="Preview"
-                  className="w-full h-40 object-cover"  //  {/* ← CHANGE h-40 to resize preview */}
+                  className="w-full h-40 object-contain"
+                  onError={() => {
+                    setUrlError('This URL is blocked by the website (hotlink protection). Try the Upload File tab instead, or use a direct image URL like one from Cloudinary.')
+                    setImagePreview('')
+                    set('image_url', '')
+                    setImageTab('url')
+                  }}
                 />
-
-                {/* Uploading overlay */}
                 {uploading && (
                   <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center gap-2">
                     <span className="w-6 h-6 border-2 border-slate-200 border-t-green-700 rounded-full animate-spin" />
-                    <span className="text-xs text-slate-500 font-medium">Image Uploading…</span>
+                    <span className="text-xs text-slate-500 font-medium">Uploading…</span>
                   </div>
                 )}
-
-                {/* Change / Remove controls */}
                 {!uploading && (
                   <div className="absolute top-2 right-2 flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-2.5 py-1.5 rounded-lg bg-white/90 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-white shadow-sm transition"
-                    >
-                      Change
-                    </button>
+                    {/* Change button */}
+                    {imageTab === 'upload' ? (
+                      <>
+                        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFilePick} />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1.5 rounded-lg bg-white/90 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-white shadow-sm transition"
+                        >
+                          Change
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setImagePreview(''); set('image_url', '') }}
+                        className="px-2.5 py-1.5 rounded-lg bg-white/90 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-white shadow-sm transition"
+                      >
+                        Change URL
+                      </button>
+                    )}
+                    {/* Remove button */}
                     <button
                       type="button"
                       onClick={handleRemoveImage}
@@ -320,25 +398,28 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
                     </button>
                   </div>
                 )}
-
-                {/* Uploaded badge */}
-                {!uploading && form.image_url && (
+                {/* Uploaded badge — only for file uploads saved to Cloudinary */}
+                {!uploading && form.image_url && imageFile && (
                   <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-semibold">
                     ✓ Uploaded
                   </div>
                 )}
+                {/* URL badge */}
+                {!uploading && form.image_url && !imageFile && (
+                  <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-xs font-semibold">
+                    🔗 URL
+                  </div>
+                )}
               </div>
             )}
-
-            {/* Upload error */}
-            {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
           </Field>
 
-          {/* ── Row: Name + SKU ── */}
+          {/* Name + SKU */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Product Name" error={errors.name} required>
               <input
-                type="text" placeholder="e.g. Whole Milk 1L"
+                type="text"
+                placeholder="e.g. Whole Milk 1L"
                 value={form.name}
                 onChange={e => set('name', e.target.value)}
                 className={inputClass(errors.name)}
@@ -346,7 +427,8 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
             </Field>
             <Field label="SKU" error={errors.sku} required>
               <input
-                type="text" placeholder="e.g. MLK-001"
+                type="text"
+                placeholder="e.g. MLK-001"
                 value={form.sku}
                 onChange={e => set('sku', e.target.value.toUpperCase())}
                 className={inputClass(errors.sku) + ' font-mono'}
@@ -354,16 +436,12 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
             </Field>
           </div>
 
-          {/* ── Row: Category + Supplier ── */}
+          {/* Category + Supplier */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Category" error={errors.category} required>
-              <select
-                value={form.category}
-                onChange={e => set('category', e.target.value)}
-                className={inputClass(errors.category)}
-              >
+              <select value={form.category} onChange={e => set('category', e.target.value)} className={inputClass(errors.category)}>
                 <option value="">Select category…</option>
-                {(categories).filter(c => c.status === 'active').map(c => (
+                {categories.filter(c => c.status === 'active').map(c => (
                   <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
               </select>
@@ -376,26 +454,20 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
                 disabled={suppLoading}
               >
                 <option value="">{suppLoading ? 'Loading suppliers…' : 'Select supplier…'}</option>
-                {suppliers.map(s => (
-                  <option key={s.id} value={s.company}>{s.company}</option>
-                ))}
+                {suppliers.map(s => <option key={s.id} value={s.company}>{s.company}</option>)}
               </select>
             </Field>
           </div>
 
-          {/* ── Row: Unit + Unit Price ── */}
+          {/* Unit + Unit Price */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Unit" error={errors.unit} required>
-              <select
-                value={form.unit}
-                onChange={e => set('unit', e.target.value)}
-                className={inputClass(errors.unit)}
-              >
+              <select value={form.unit} onChange={e => set('unit', e.target.value)} className={inputClass(errors.unit)}>
                 <option value="">Select unit…</option>
                 {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </Field>
-            <Field label="Unit Price (₱)" error={errors.unit_price} required>
+            <Field label="Retail Price / Unit Price (₱)" error={errors.unit_price} required>
               <input
                 type="number" min="0" step="0.01" placeholder="0.00"
                 value={form.unit_price}
@@ -405,14 +477,14 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
             </Field>
           </div>
 
-          {/* ── Row: Stock + Threshold ── */}
+          {/* Cost + Threshold */}
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Current Stock" error={errors.stock} required>
+            <Field label="Cost Price (₱)" error={errors.cost}>
               <input
-                type="number" min="0" placeholder="0"
-                value={form.stock}
-                onChange={e => set('stock', e.target.value)}
-                className={inputClass(errors.stock)}
+                type="number" min="0" step="0.01" placeholder="0.00"
+                value={form.cost}
+                onChange={e => set('cost', e.target.value)}
+                className={inputClass(errors.cost)}
               />
             </Field>
             <Field label="Low Stock Threshold" error={errors.threshold} required>
@@ -425,9 +497,19 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
             </Field>
           </div>
 
+          {/* Stock */}
+          <Field label="Current Stock" error={errors.stock} required>
+            <input
+              type="number" min="0" placeholder="0"
+              value={form.stock}
+              onChange={e => set('stock', e.target.value)}
+              className={inputClass(errors.stock)}
+            />
+          </Field>
+
         </div>
 
-        {/* ── Footer ── */}
+        {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
           <button
             onClick={onClose}
@@ -454,7 +536,6 @@ export default function ProductModal({ isOpen, mode, product, categories = [], o
   )
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 function Field({ label, error, required, children }) {
   return (
     <div>

@@ -86,11 +86,13 @@ export default function Sidebar() {
     <aside className="fixed top-0 left-0 h-screen w-64 bg-white border-r border-slate-200 flex flex-col z-50">
 
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-slate-100">
-        <span className="text-xl font-bold tracking-tight" style={{ color: '#14532d' }}>
-          Mart.
-        </span>
-      </div>
+<div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+  <img src="/mart.png" alt="Imagineers Consumers Cooperative" className="h-10 w-auto" />
+  <div>
+    <p className="text-sm font-bold text-slate-800 leading-tight">Imagineers</p>
+    <p className="text-xs text-slate-400 leading-tight">Consumers Cooperative</p>
+  </div>
+</div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
