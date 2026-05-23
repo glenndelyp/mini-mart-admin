@@ -25,8 +25,6 @@ const NAV_BY_ROLE = {
     { label: 'Supplier Management',  href: '/suppliers',   icon: Truck           },
     { label: 'Category',             href: '/categories',  icon: Tag             },
     { label: 'Locations',            href: '/locations',   icon: MapPin          },
-    { label: 'Settings',             href: '/settings',    icon: Settings        },
-    { label: 'Manage Staff',         href: '/admin/staff', icon: Users           },
   ],
   cashier: [
     { label: 'Dashboard',        href: '/dashboard', icon: LayoutDashboard },

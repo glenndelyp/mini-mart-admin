@@ -30,6 +30,21 @@ export default async function handler(req, res) {
       return res.status(401).json({ message: 'Incorrect password.' })
     }
 
+    // ── Log the login ──
+    try {
+      await sql`
+        INSERT INTO login_logs (admin_id, ip, user_agent)
+        VALUES (
+          ${admin.id},
+          ${req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown'},
+          ${req.headers['user-agent'] || 'unknown'}
+        )
+      `
+    } catch (logErr) {
+      // Don't block login if logging fails
+      console.warn('[login_log warning]', logErr.message)
+    }
+
     const { password: _, ...safeAdmin } = admin
 
     res.setHeader('Set-Cookie', [

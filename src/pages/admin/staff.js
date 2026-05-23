@@ -18,18 +18,21 @@ export default function ManageStaff() {
   const [form, setForm] = useState({
     first_name: '', last_name: '', username: '', password: '', role: 'cashier',
   })
-  const [staffList,    setStaffList]    = useState([])
-  const [tableLoading, setTableLoading] = useState(true)
-  const [currentRole,  setCurrentRole]  = useState(null)
-  const [search,       setSearch]       = useState('')
-  const [roleFilter,   setRoleFilter]   = useState('All')
-  const [statusFilter, setStatusFilter] = useState('All')
-  const [page,         setPage]         = useState(1)
-  const [message,      setMessage]      = useState({ text: '', type: '' })
-  const [submitting,   setSubmitting]   = useState(false)
-  const [showPass,     setShowPass]     = useState(false)
-  const [toast,        setToast]        = useState(null)
-  const [modalOpen,    setModalOpen]    = useState(false)
+  const [staffList,      setStaffList]      = useState([])
+  const [tableLoading,   setTableLoading]   = useState(true)
+  const [currentRole,    setCurrentRole]    = useState(null)
+  const [search,         setSearch]         = useState('')
+  const [roleFilter,     setRoleFilter]     = useState('All')
+  const [statusFilter,   setStatusFilter]   = useState('All')
+  const [page,           setPage]           = useState(1)
+  const [message,        setMessage]        = useState({ text: '', type: '' })
+  const [submitting,     setSubmitting]     = useState(false)
+  const [showPass,       setShowPass]       = useState(false)
+  const [toast,          setToast]          = useState(null)
+  const [modalOpen,      setModalOpen]      = useState(false)
+  const [step,           setStep]           = useState('form') // 'form' | 'confirm'
+  const [confirmCode,    setConfirmCode]    = useState('')
+  const [generatedCode,  setGeneratedCode]  = useState(null)
 
   // Admin card only visible to superadmin
   const roleOptions = ALL_ROLE_OPTIONS.filter(
@@ -68,21 +71,28 @@ export default function ManageStaff() {
     setForm({ first_name: '', last_name: '', username: '', password: '', role: 'cashier' })
     setMessage({ text: '', type: '' })
     setShowPass(false)
+    setStep('form')
+    setConfirmCode('')
+    setGeneratedCode(null)
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
+    setStep('form')
+    setConfirmCode('')
+    setGeneratedCode(null)
     setMessage({ text: '', type: '' })
   }
 
-  async function handleCreate(e) {
+  // Step 1 — request a confirmation code from the server
+  async function handleRequestCode(e) {
     e.preventDefault()
     setSubmitting(true)
     setMessage({ text: '', type: '' })
 
     try {
-      const res  = await fetch('/api/admin/create-staff', {
+      const res  = await fetch('/api/admin/request-staff-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -91,6 +101,34 @@ export default function ManageStaff() {
 
       if (!res.ok) {
         setMessage({ text: data.message || 'Something went wrong.', type: 'error' })
+      } else {
+        setGeneratedCode(data.code)
+        setStep('confirm')
+        setMessage({ text: '', type: '' })
+      }
+    } catch {
+      setMessage({ text: 'Network error. Please try again.', type: 'error' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Step 2 — submit the confirmation code to finalize account creation
+  async function handleConfirmCreate(e) {
+    e.preventDefault()
+    setSubmitting(true)
+    setMessage({ text: '', type: '' })
+
+    try {
+      const res  = await fetch('/api/admin/create-staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: confirmCode }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMessage({ text: data.message || 'Invalid or expired code.', type: 'error' })
       } else {
         closeModal()
         showToast(`Account created for ${form.username} (${form.role})!`)
@@ -391,8 +429,14 @@ export default function ManageStaff() {
               {/* Modal header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
                 <div>
-                  <h2 className="text-base font-bold text-slate-800">Add Staff Account</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Fill in the details to create a new account</p>
+                  <h2 className="text-base font-bold text-slate-800">
+                    {step === 'form' ? 'Add Staff Account' : 'Confirm Account Creation'}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {step === 'form'
+                      ? 'Fill in the details to create a new account'
+                      : `Creating account for ${form.first_name} ${form.last_name} · ${form.role}`}
+                  </p>
                 </div>
                 <button
                   onClick={closeModal}
@@ -402,136 +446,208 @@ export default function ManageStaff() {
                 </button>
               </div>
 
-              {/* Modal body */}
-              <form onSubmit={handleCreate} className="px-6 py-5 space-y-4">
+              {/* ── STEP 1: Form ── */}
+              {step === 'form' && (
+                <form onSubmit={handleRequestCode} className="px-6 py-5 space-y-4">
 
-                {/* Name row */}
-                <div className="grid grid-cols-2 gap-3">
+                  {/* Name row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                        First Name
+                      </label>
+                      <input
+                        className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm text-slate-800 bg-slate-50 outline-none focus:border-emerald-400 focus:bg-white transition"
+                        placeholder="Juan"
+                        value={form.first_name}
+                        onChange={e => setForm({ ...form, first_name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                        Last Name
+                      </label>
+                      <input
+                        className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm text-slate-800 bg-slate-50 outline-none focus:border-emerald-400 focus:bg-white transition"
+                        placeholder="Dela Cruz"
+                        value={form.last_name}
+                        onChange={e => setForm({ ...form, last_name: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Username */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                      First Name
+                      Username
                     </label>
                     <input
                       className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm text-slate-800 bg-slate-50 outline-none focus:border-emerald-400 focus:bg-white transition"
-                      placeholder="Juan"
-                      value={form.first_name}
-                      onChange={e => setForm({ ...form, first_name: e.target.value })}
+                      placeholder="e.g. cashier_juan"
+                      value={form.username}
+                      onChange={e => setForm({ ...form, username: e.target.value })}
                       required
                     />
                   </div>
+
+                  {/* Role selector */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                      Last Name
+                      Role
                     </label>
-                    <input
-                      className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm text-slate-800 bg-slate-50 outline-none focus:border-emerald-400 focus:bg-white transition"
-                      placeholder="Dela Cruz"
-                      value={form.last_name}
-                      onChange={e => setForm({ ...form, last_name: e.target.value })}
-                      required
-                    />
+                    <div className={`grid gap-2 ${roleOptions.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                      {roleOptions.map(r => (
+                        <button
+                          key={r.value}
+                          type="button"
+                          onClick={() => setForm({ ...form, role: r.value })}
+                          className={`flex items-start gap-3 px-3 py-3 rounded-xl border-2 text-left transition ${
+                            form.role === r.value
+                              ? r.activeColor
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="text-xl leading-none mt-0.5">{r.icon}</span>
+                          <div>
+                            <p className={`text-sm font-semibold ${
+                              form.role === r.value ? r.textColor : 'text-slate-700'
+                            }`}>
+                              {r.label}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5">{r.desc}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Username */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    Username
-                  </label>
-                  <input
-                    className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm text-slate-800 bg-slate-50 outline-none focus:border-emerald-400 focus:bg-white transition"
-                    placeholder="e.g. cashier_juan"
-                    value={form.username}
-                    onChange={e => setForm({ ...form, username: e.target.value })}
-                    required
-                  />
-                </div>
-
-                {/* Role selector — Admin card only shown to superadmin */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    Role
-                  </label>
-                  <div className={`grid gap-2 ${roleOptions.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                    {roleOptions.map(r => (
+                  {/* Password */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                      Temporary Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        className="w-full h-10 px-3 pr-10 border border-slate-200 rounded-lg text-sm text-slate-800 bg-slate-50 outline-none focus:border-emerald-400 focus:bg-white transition"
+                        type={showPass ? 'text' : 'password'}
+                        placeholder="Set a temporary password"
+                        value={form.password}
+                        onChange={e => setForm({ ...form, password: e.target.value })}
+                        required
+                      />
                       <button
-                        key={r.value}
                         type="button"
-                        onClick={() => setForm({ ...form, role: r.value })}
-                        className={`flex items-start gap-3 px-3 py-3 rounded-xl border-2 text-left transition ${
-                          form.role === r.value
-                            ? r.activeColor
-                            : 'border-slate-200 bg-white hover:border-slate-300'
-                        }`}
+                        onClick={() => setShowPass(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
                       >
-                        <span className="text-xl leading-none mt-0.5">{r.icon}</span>
-                        <div>
-                          <p className={`text-sm font-semibold ${
-                            form.role === r.value ? r.textColor : 'text-slate-700'
-                          }`}>
-                            {r.label}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-0.5">{r.desc}</p>
-                        </div>
+                        {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
-                    ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Password */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    Temporary Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      className="w-full h-10 px-3 pr-10 border border-slate-200 rounded-lg text-sm text-slate-800 bg-slate-50 outline-none focus:border-emerald-400 focus:bg-white transition"
-                      type={showPass ? 'text' : 'password'}
-                      placeholder="Set a temporary password"
-                      value={form.password}
-                      onChange={e => setForm({ ...form, password: e.target.value })}
-                      required
-                    />
+                  {/* Error message */}
+                  {message.text && (
+                    <div className="px-3 py-2.5 rounded-lg text-xs font-medium border bg-red-50 text-red-600 border-red-200">
+                      {message.text}
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="flex items-center gap-3 pt-1">
                     <button
                       type="button"
-                      onClick={() => setShowPass(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                      onClick={closeModal}
+                      className="flex-1 h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
                     >
-                      {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex-1 h-10 rounded-lg text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                      style={{ backgroundColor: '#14532d' }}
+                    >
+                      {submitting ? 'Generating…' : 'Continue →'}
                     </button>
                   </div>
-                </div>
+                </form>
+              )}
 
-                {/* Error / success message */}
-                {message.text && (
-                  <div className={`px-3 py-2.5 rounded-lg text-xs font-medium border ${
-                    message.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-red-50 text-red-600 border-red-200'
-                  }`}>
-                    {message.text}
+              {/* ── STEP 2: Confirm code ── */}
+              {step === 'confirm' && (
+                <form onSubmit={handleConfirmCreate} className="px-6 py-5 space-y-4">
+
+                  {/* Generated code display */}
+                  <div className="bg-violet-50 border border-violet-200 rounded-xl p-5 text-center">
+                    <p className="text-xs text-violet-500 font-semibold uppercase tracking-widest mb-3">
+                      Your Confirmation Code
+                    </p>
+                    <p className="text-5xl font-bold tracking-[0.35em] text-violet-700 font-mono">
+                      {generatedCode}
+                    </p>
+                    <p className="text-xs text-violet-400 mt-3">
+                      ⏱ Expires in 5 minutes · One-time use only
+                    </p>
                   </div>
-                )}
 
-                {/* Footer buttons */}
-                <div className="flex items-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="flex-1 h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="flex-1 h-10 rounded-lg text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                    style={{ backgroundColor: '#14532d' }}
-                  >
-                    {submitting ? 'Creating…' : 'Create Account'}
-                  </button>
-                </div>
-              </form>
+                  {/* Divider with instruction */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-slate-100" />
+                    <p className="text-xs text-slate-400 whitespace-nowrap">Enter the code below to confirm</p>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+
+                  {/* Code input */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                      Confirmation Code
+                    </label>
+                    <input
+                      className="w-full h-12 px-3 border-2 border-slate-200 rounded-xl text-2xl font-mono font-bold text-center text-slate-800 bg-slate-50 outline-none focus:border-violet-400 focus:bg-white tracking-[0.4em] transition"
+                      placeholder="000000"
+                      maxLength={6}
+                      value={confirmCode}
+                      onChange={e => setConfirmCode(e.target.value.replace(/\D/g, ''))}
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Error message */}
+                  {message.text && (
+                    <div className="px-3 py-2.5 rounded-lg text-xs font-medium border bg-red-50 text-red-600 border-red-200">
+                      {message.text}
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep('form')
+                        setConfirmCode('')
+                        setGeneratedCode(null)
+                        setMessage({ text: '', type: '' })
+                      }}
+                      className="flex-1 h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting || confirmCode.length !== 6}
+                      className="flex-1 h-10 rounded-lg text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                      style={{ backgroundColor: '#14532d' }}
+                    >
+                      {submitting ? 'Creating…' : 'Confirm & Create'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
             </div>
           </div>
         )}

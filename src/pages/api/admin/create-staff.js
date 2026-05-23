@@ -10,22 +10,49 @@ export default async function handler(req, res) {
     return res.status(403).json({ message: 'Not authorized.' })
   }
 
-  const { first_name, last_name, username, password, role } = req.body
+  const { code } = req.body
 
-  // ✅ Both roles allowed
-  const ALLOWED_ROLES = ['cashier', 'admin']
-  if (!ALLOWED_ROLES.includes(role)) {
-    return res.status(400).json({ message: 'Invalid role.' })
-  }
-
-  // ✅ Only superadmin can create admin accounts
-  if (role === 'admin' && requester.role !== 'superadmin') {
-    return res.status(403).json({ message: 'Only superadmin can create admin accounts.' })
+  if (!code) {
+    return res.status(400).json({ message: 'Confirmation code is required.' })
   }
 
   try {
+    // ✅ Removed created_by filter — was causing mismatch
+    const rows = await sql`
+      SELECT * FROM staff_confirmation_codes
+      WHERE code = ${code}
+        AND used = FALSE
+        AND expires_at > NOW()
+      LIMIT 1
+    `
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired confirmation code.' })
+    }
+
+    const record = rows[0]
+
+
+
+// Parse once
+      let payload = typeof record.payload === 'string'
+        ? JSON.parse(record.payload)
+        : record.payload
+
+      if (typeof payload === 'string') {
+        payload = JSON.parse(payload)
+      }
+
+      const { first_name, last_name, username, password, role } = payload
+
+      console.log('[create-staff] parsed payload:', payload)
+
+    if (!first_name || !last_name || !username || !password || !role) {
+      return res.status(400).json({ message: 'Payload incomplete. Please go back and try again.' })
+    }
+
     const existing = await sql`
-      select id from admins where username = ${username}
+      SELECT id FROM admins WHERE username = ${username}
     `
     if (existing.length > 0) {
       return res.status(400).json({ message: 'Username already taken.' })
@@ -34,14 +61,20 @@ export default async function handler(req, res) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     const result = await sql`
-      insert into admins (first_name, last_name, username, password, role, is_active)
-      values (${first_name}, ${last_name}, ${username}, ${hashedPassword}, ${role}, true)
-      returning id, first_name, last_name, username, role, is_active, created_at
+      INSERT INTO admins (first_name, last_name, username, password, role, is_active)
+      VALUES (${first_name}, ${last_name}, ${username}, ${hashedPassword}, ${role}, true)
+      RETURNING id, first_name, last_name, username, role, is_active, created_at
+    `
+
+    await sql`
+      UPDATE staff_confirmation_codes SET used = TRUE WHERE id = ${record.id}
     `
 
     return res.status(200).json({ staff: result[0] })
+
   } catch (err) {
     console.error('[create-staff error]', err)
-    return res.status(500).json({ message: 'Server error.' })
+    // ✅ Shows real error in modal instead of generic "Server error."
+    return res.status(500).json({ message: err.message })
   }
 }
