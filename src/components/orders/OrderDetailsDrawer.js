@@ -231,12 +231,14 @@ export default function OrderDetailsDrawer({ order, onClose, onAction }) {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Payment</span>
-                <span className="text-slate-600 font-medium capitalize">{order.payment_method ?? '—'}</span>
+                <span className="text-slate-600 font-medium">Cash on Delivery</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Payment Status</span>
-                <span className={`font-semibold capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {order.payment_status ?? '—'}
+                <span className={`font-semibold capitalize ${
+                  order.status === 'delivered' ? 'text-emerald-600' : 'text-amber-600'
+                }`}>
+                  {order.status === 'delivered' ? 'Paid' : 'Unpaid'}
                 </span>
               </div>
             </div>

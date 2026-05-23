@@ -1,19 +1,23 @@
 // src/components/layout/Header.js
 import { useState, useEffect, useRef } from 'react'
 import {
-  Search, Bell, ChevronDown, LogOut, Settings,
+  Search, Bell, ChevronDown, LogOut, 
   Package, ShoppingBag, AlertTriangle, Clock, X,
 } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { useNotifications } from '@/hooks/useNotifications'
 
-function getAdminFromCookie() {
-  if (typeof document === 'undefined') return null
-  const match = document.cookie.split('; ').find(row => row.startsWith('mart_admin='))
-  if (!match) return null
-  try {
-    return JSON.parse(decodeURIComponent(match.split('=').slice(1).join('=')))
-  } catch { return null }
+// ── Role badge styles (mirrors Sidebar) ───────────────────────────────────
+const ROLE_BADGE = {
+  superadmin: { bg: '#f0fdf4', color: '#14532d', border: '#bbf7d0' },
+  admin:      { bg: '#f0fdf4', color: '#14532d', border: '#bbf7d0' },
+  cashier:    { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
+}
+
+const ROLE_LABEL = {
+  superadmin: 'Super Admin',
+  admin:      'Admin',
+  cashier:    'Cashier',
 }
 
 // ── Notification type config ───────────────────────────────────────────────
@@ -185,7 +189,19 @@ export default function Header() {
 
   const { notifications, loading, unreadCount, markAllRead } = useNotifications()
 
-  useEffect(() => { setAdmin(getAdminFromCookie()) }, [])
+  // ✅ Fetch from API (same source as Sidebar) — cookie role was unreliable
+  useEffect(() => {
+    async function fetchAdmin() {
+      try {
+        const res  = await fetch('/api/auth/me')
+        const data = await res.json()
+        setAdmin(data.admin ?? null)
+      } catch {
+        // silently fail
+      }
+    }
+    fetchAdmin()
+  }, [])
 
   useEffect(() => {
     const handler = (e) => {
@@ -203,10 +219,11 @@ export default function Header() {
     router.replace('/login')
   }
 
+  const role      = admin?.role?.toLowerCase().trim() ?? null
+  const badge     = ROLE_BADGE[role] ?? { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' }
   const initials  = admin ? `${admin.first_name?.[0] ?? ''}${admin.last_name?.[0] ?? ''}`.toUpperCase() : 'A'
   const fullName  = admin ? `${admin.first_name} ${admin.last_name}` : 'Admin'
-  const ROLE_LABEL = { superadmin: 'Super Admin', admin: 'Admin', cashier: 'Cashier' }
-  const roleLabel = ROLE_LABEL[admin?.role?.toLowerCase()] ?? 'Staff'
+  const roleLabel = ROLE_LABEL[role] ?? 'Staff'
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-6 h-16 flex items-center justify-between">
@@ -288,21 +305,19 @@ export default function Header() {
               <div className="px-4 py-3 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-800">{fullName}</p>
                 <p className="text-xs text-slate-400 mt-0.5">@{admin?.username ?? 'admin'}</p>
+
+                {/* ✅ Role badge — matches sidebar colors per role */}
                 <span
                   className="inline-block mt-1.5 text-xs font-semibold px-2 py-0.5 rounded-full border"
-                  style={{ color: '#14532d', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}
+                  style={{
+                    color:           badge.color,
+                    backgroundColor: badge.bg,
+                    borderColor:     badge.border,
+                  }}
                 >
                   {roleLabel}
                 </span>
               </div>
-
-              <button
-                onClick={() => { setDropOpen(false); router.push('/settings') }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition"
-              >
-                <Settings size={15} className="text-slate-400" />
-                Settings
-              </button>
 
               <div className="border-t border-slate-100 mt-1 pt-1">
                 <button

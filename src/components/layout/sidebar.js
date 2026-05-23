@@ -29,6 +29,10 @@ const NAV_BY_ROLE = {
   cashier: [
     { label: 'Dashboard',        href: '/dashboard', icon: LayoutDashboard },
     { label: 'Order Management', href: '/orders',    icon: ShoppingBag     },
+    { label: 'Inventory Management', href: '/inventory',   icon: Package         },
+    { label: 'Category',             href: '/categories',  icon: Tag             },
+
+
   ],
 }
 
