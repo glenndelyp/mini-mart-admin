@@ -5,7 +5,7 @@ import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' })
 
-  const admin = getAdminFromCookie(req)
+  const admin = await getAdminFromCookie(req)
   if (!admin) return res.status(401).json({ message: 'Not authenticated' })
 
   const { currentPassword, newPassword, targetAdminId } = req.body
@@ -13,16 +13,12 @@ export default async function handler(req, res) {
   if (!newPassword || newPassword.length < 8)
     return res.status(400).json({ message: 'New password must be at least 8 characters' })
 
-  // ── Superadmin resetting someone else's password (no current password needed) ──
   if (targetAdminId && admin.role === 'superadmin') {
     const hashed = await bcrypt.hash(newPassword, 12)
-    await sql`
-      UPDATE admins SET password = ${hashed} WHERE id = ${targetAdminId}
-    `
+    await sql`UPDATE admins SET password = ${hashed} WHERE id = ${targetAdminId}`
     return res.status(200).json({ ok: true })
   }
 
-  // ── Regular change: verify current password first ──
   if (!currentPassword)
     return res.status(400).json({ message: 'Current password is required' })
 

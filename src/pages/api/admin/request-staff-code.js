@@ -4,7 +4,7 @@ import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const requester = getAdminFromCookie(req)
+  const requester = await getAdminFromCookie(req)
   if (!requester || requester.role !== 'superadmin') {
     return res.status(403).json({ message: 'Only superadmin can generate confirmation codes.' })
   }
@@ -36,7 +36,6 @@ export default async function handler(req, res) {
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
 
-    // ✅ Pass object directly — no JSON.stringify
     const payload = { first_name, last_name, username, password, role }
 
     await sql`

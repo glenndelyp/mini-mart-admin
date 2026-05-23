@@ -1,8 +1,11 @@
-// src/pages/api/suppliers/index.js
 import { sql } from '../../../lib/db'
+import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ message: 'Method not allowed.' })
+
+  const admin = await getAdminFromCookie(req)
+  if (!admin) return res.status(401).json({ message: 'Not authenticated.' })
 
   try {
     const suppliers = await sql`

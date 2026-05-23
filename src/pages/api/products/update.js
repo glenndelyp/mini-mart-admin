@@ -1,8 +1,13 @@
-// src/pages/api/products/update.js
 import { sql } from '../../../lib/db'
+import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT') return res.status(405).json({ message: 'Method not allowed.' })
+
+  const admin = await getAdminFromCookie(req)
+  if (!admin || !['superadmin', 'admin'].includes(admin.role)) {
+    return res.status(403).json({ message: 'Not authorized.' })
+  }
 
   const { id, name, sku, category, stock, unit, unit_price, cost, threshold, supplier, image_url } = req.body
 

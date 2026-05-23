@@ -1,18 +1,19 @@
-// src/pages/api/products/delete.js
 import { sql } from '../../../lib/db'
+import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
   if (req.method !== 'DELETE') return res.status(405).json({ message: 'Method not allowed.' })
 
-  const { id } = req.body
+  const admin = await getAdminFromCookie(req)
+  if (!admin || !['superadmin', 'admin'].includes(admin.role)) {
+    return res.status(403).json({ message: 'Not authorized.' })
+  }
 
+  const { id } = req.body
   if (!id) return res.status(400).json({ message: 'Product ID is required.' })
 
   try {
-    const result = await sql`
-      DELETE FROM products WHERE id = ${id}
-      RETURNING id
-    `
+    const result = await sql`DELETE FROM products WHERE id = ${id} RETURNING id`
     if (result.length === 0) return res.status(404).json({ message: 'Product not found.' })
     return res.status(200).json({ message: 'Product deleted successfully.' })
   } catch (err) {

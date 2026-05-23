@@ -1,5 +1,5 @@
-// src/pages/api/notifications.js
 import { sql } from '../../lib/db'
+import { getAdminFromCookie } from '../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -7,8 +7,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed.' })
   }
 
+  const admin = await getAdminFromCookie(req)
+  if (!admin) return res.status(401).json({ message: 'Not authenticated.' })
+
   try {
-    // ── 1. Low stock & out-of-stock items ────────────────────────────────
     const inventoryItems = await sql`
       SELECT id, name, stock, threshold, unit
       FROM products
@@ -17,20 +19,16 @@ export default async function handler(req, res) {
       LIMIT 10
     `
 
-    // ── 2. Pending orders ────────────────────────────────────────────────
     const pendingOrders = await sql`
-      SELECT id, created_at
-      FROM orders
+      SELECT id, created_at FROM orders
       WHERE status = 'pending'
       ORDER BY created_at DESC
       LIMIT 10
     `
 
-    // ── 3. Overdue orders (pending > 24 hours) ───────────────────────────
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const overdueOrders = pendingOrders.filter(o => o.created_at < cutoff)
 
-    // ── Build unified notification list ──────────────────────────────────
     const notifications = []
 
     overdueOrders.forEach(o => {
@@ -70,12 +68,9 @@ export default async function handler(req, res) {
       })
     })
 
-    // Sort: overdue → out_of_stock → low_stock → pending_order, then newest first
     const priority = { overdue: 0, out_of_stock: 1, low_stock: 2, pending_order: 3 }
     notifications.sort(
-      (a, b) =>
-        (priority[a.type] - priority[b.type]) ||
-        new Date(b.time) - new Date(a.time)
+      (a, b) => (priority[a.type] - priority[b.type]) || new Date(b.time) - new Date(a.time)
     )
 
     return res.status(200).json({ notifications: notifications.slice(0, 20) })

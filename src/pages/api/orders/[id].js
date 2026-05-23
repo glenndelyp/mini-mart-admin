@@ -1,13 +1,14 @@
-// src/pages/api/orders/[id].js
 import { sql } from '../../../lib/db'
+import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
+  const admin = await getAdminFromCookie(req)
+  if (!admin) return res.status(401).json({ message: 'Not authenticated.' })
+
   const { id } = req.query
 
-  // PATCH /api/orders/:id  → update status
   if (req.method === 'PATCH') {
     const { status, notes } = req.body
-
     const allowed = ['confirmed', 'in_transit', 'delivered', 'cancelled']
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: 'Invalid status.' })
@@ -22,10 +23,7 @@ export default async function handler(req, res) {
 
       const [order] = await sql`
         UPDATE orders
-        SET
-          status = ${status},
-          notes  = COALESCE(${notes || null}, notes)
-          ${extra}
+        SET status = ${status}, notes = COALESCE(${notes || null}, notes) ${extra}
         WHERE id = ${id}
         RETURNING *
       `
@@ -39,7 +37,6 @@ export default async function handler(req, res) {
       const items = await sql`
         SELECT * FROM order_items WHERE order_id = ${id} ORDER BY id ASC
       `
-
       return res.status(200).json({
         order: {
           ...order,
@@ -54,12 +51,13 @@ export default async function handler(req, res) {
     }
   }
 
-  // DELETE /api/orders/:id
   if (req.method === 'DELETE') {
+    // Only superadmin can delete orders
+    if (admin.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Only superadmin can delete orders.' })
+    }
     try {
-      const [deleted] = await sql`
-        DELETE FROM orders WHERE id = ${id} RETURNING id
-      `
+      const [deleted] = await sql`DELETE FROM orders WHERE id = ${id} RETURNING id`
       if (!deleted) return res.status(404).json({ message: 'Order not found.' })
       return res.status(200).json({ message: 'Order deleted.' })
     } catch (err) {

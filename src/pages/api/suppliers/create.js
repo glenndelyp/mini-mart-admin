@@ -1,8 +1,13 @@
-// src/pages/api/suppliers/create.js
 import { sql } from '../../../lib/db'
+import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed.' })
+
+  const admin = await getAdminFromCookie(req)
+  if (!admin || !['superadmin', 'admin'].includes(admin.role)) {
+    return res.status(403).json({ message: 'Not authorized.' })
+  }
 
   const { full_name, company, contact_num, email, address, status } = req.body
 

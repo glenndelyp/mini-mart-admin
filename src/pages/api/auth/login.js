@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { SignJWT } from 'jose'
 import { sql } from '../../../lib/db'
 
 export default async function handler(req, res) {
@@ -41,14 +42,26 @@ export default async function handler(req, res) {
         )
       `
     } catch (logErr) {
-      // Don't block login if logging fails
       console.warn('[login_log warning]', logErr.message)
     }
 
     const { password: _, ...safeAdmin } = admin
 
+    // ── Sign JWT instead of raw JSON ──
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
+    const token = await new SignJWT({
+      id:         safeAdmin.id,
+      role:       safeAdmin.role,
+      username:   safeAdmin.username,
+      first_name: safeAdmin.first_name,
+      last_name:  safeAdmin.last_name,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('8h')
+      .sign(secret)
+
     res.setHeader('Set-Cookie', [
-      `mart_admin=${encodeURIComponent(JSON.stringify(safeAdmin))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 8}`,
+      `mart_admin=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 8}`,
       `mart_admin_auth=1; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 8}`,
     ])
 

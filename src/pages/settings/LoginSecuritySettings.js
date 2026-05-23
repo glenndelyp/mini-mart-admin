@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react'
-import { CheckCircle, Eye, EyeOff, Lock, Monitor, Users, ChevronDown } from 'lucide-react'
+import { CheckCircle, Eye, EyeOff, Lock, Monitor, Users, ChevronDown, Trash2 } from 'lucide-react'
 
-// ─── Utility ──────────────────────────────────────────────────────────────────
 function formatUserAgent(ua) {
   if (!ua) return 'Unknown device'
-  if (ua.includes('Chrome') && !ua.includes('Edg'))  return 'Chrome on ' + (ua.includes('Windows') ? 'Windows' : ua.includes('Mac') ? 'Mac' : 'Linux')
-  if (ua.includes('Firefox'))  return 'Firefox on ' + (ua.includes('Windows') ? 'Windows' : ua.includes('Mac') ? 'Mac' : 'Linux')
+  if (ua.includes('Chrome') && !ua.includes('Edg'))    return 'Chrome on '  + (ua.includes('Windows') ? 'Windows' : ua.includes('Mac') ? 'Mac' : 'Linux')
+  if (ua.includes('Firefox'))                          return 'Firefox on ' + (ua.includes('Windows') ? 'Windows' : ua.includes('Mac') ? 'Mac' : 'Linux')
   if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari on Mac'
-  if (ua.includes('Edg'))      return 'Edge on Windows'
+  if (ua.includes('Edg'))                              return 'Edge on Windows'
   return ua.substring(0, 40)
 }
 
-// ─── Shared sub-components ────────────────────────────────────────────────────
 function SectionCard({ title, subtitle, icon: Icon, children }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
@@ -82,12 +80,10 @@ function StrengthBar({ password }) {
   )
 }
 
-// ─── LoginSecuritySettings ────────────────────────────────────────────────────
 export default function LoginSecuritySettings() {
   const [currentAdmin, setCurrentAdmin] = useState(null)
   const isSuperAdmin = currentAdmin?.role === 'superadmin'
 
-  // ── Change own password ──
   const [currentPw,  setCurrentPw]  = useState('')
   const [newPw,      setNewPw]      = useState('')
   const [confirmPw,  setConfirmPw]  = useState('')
@@ -95,7 +91,6 @@ export default function LoginSecuritySettings() {
   const [pwSaving,   setPwSaving]   = useState(false)
   const [pwToast,    setPwToast]    = useState(null)
 
-  // ── Reset another admin's password (superadmin only) ──
   const [admins,       setAdmins]       = useState([])
   const [targetId,     setTargetId]     = useState('')
   const [resetPw,      setResetPw]      = useState('')
@@ -104,12 +99,10 @@ export default function LoginSecuritySettings() {
   const [resetSaving,  setResetSaving]  = useState(false)
   const [resetToast,   setResetToast]   = useState(null)
 
-  // ── Sessions ──
-  const [sessions,     setSessions]     = useState([])
-  const [loadingSess,  setLoadingSess]  = useState(true)
+  const [sessions,    setSessions]    = useState([])
+  const [loadingSess, setLoadingSess] = useState(true)
 
   useEffect(() => {
-    // Fetch current admin first, then load staff list if superadmin
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
@@ -125,12 +118,11 @@ export default function LoginSecuritySettings() {
 
     fetch('/api/settings/sessions')
       .then(r => r.json())
-      .then(d => { setSessions(d.sessions) })
+      .then(d => setSessions(d.sessions ?? []))
       .catch(() => {})
       .finally(() => setLoadingSess(false))
   }, [])
 
-  // ── Handle own password change ──
   const handleChangePassword = async () => {
     setPwError('')
     if (!currentPw || !newPw || !confirmPw) { setPwError('Please fill in all fields.'); return }
@@ -156,12 +148,11 @@ export default function LoginSecuritySettings() {
     }
   }
 
-  // ── Handle superadmin reset ──
   const handleReset = async () => {
     setResetError('')
-    if (!targetId)                              { setResetError('Please select an account.'); return }
-    if (!resetPw || resetPw.length < 8)         { setResetError('New password must be at least 8 characters.'); return }
-    if (resetPw !== resetConfirm)               { setResetError('Passwords do not match.'); return }
+    if (!targetId)                        { setResetError('Please select an account.'); return }
+    if (!resetPw || resetPw.length < 8)   { setResetError('New password must be at least 8 characters.'); return }
+    if (resetPw !== resetConfirm)         { setResetError('Passwords do not match.'); return }
 
     setResetSaving(true)
     try {
@@ -182,6 +173,19 @@ export default function LoginSecuritySettings() {
     }
   }
 
+  const handleDeleteSession = async (id) => {
+    setSessions(prev => prev.filter(s => s.id !== id))
+    try {
+      await fetch('/api/settings/sessions', {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ id }),
+      })
+    } catch {
+      // silently fail — row already removed optimistically
+    }
+  }
+
   const formatDate = iso => iso
     ? new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '—'
@@ -191,11 +195,9 @@ export default function LoginSecuritySettings() {
 
       {/* ── Change Own Password ── */}
       <SectionCard icon={Lock} title="Change Password" subtitle="Update your password regularly to keep your account secure">
-
         <Field label="Current password">
           <PasswordInput value={currentPw} onChange={setCurrentPw} placeholder="Enter current password" />
         </Field>
-
         <div className="grid grid-cols-2 gap-3">
           <Field label="New password">
             <PasswordInput value={newPw} onChange={setNewPw} placeholder="Min. 8 characters" />
@@ -204,13 +206,10 @@ export default function LoginSecuritySettings() {
             <PasswordInput value={confirmPw} onChange={setConfirmPw} placeholder="Repeat new password" />
           </Field>
         </div>
-
         <StrengthBar password={newPw} />
-
         {pwError && (
           <p className="text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{pwError}</p>
         )}
-
         <div className="flex items-center justify-end gap-3 pt-1">
           {pwToast === 'success' && (
             <span className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
@@ -229,7 +228,6 @@ export default function LoginSecuritySettings() {
       {isSuperAdmin && (
         <SectionCard icon={Users} title="Reset Staff Password"
           subtitle="As superadmin, you can reset any account's password without knowing the current one">
-
           <Field label="Select account">
             <div className="relative">
               <select
@@ -250,7 +248,6 @@ export default function LoginSecuritySettings() {
               <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </Field>
-
           <div className="grid grid-cols-2 gap-3">
             <Field label="New password">
               <PasswordInput value={resetPw} onChange={setResetPw} placeholder="Min. 8 characters" />
@@ -259,13 +256,10 @@ export default function LoginSecuritySettings() {
               <PasswordInput value={resetConfirm} onChange={setResetConfirm} placeholder="Repeat password" />
             </Field>
           </div>
-
           <StrengthBar password={resetPw} />
-
           {resetError && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{resetError}</p>
           )}
-
           <div className="flex items-center justify-end gap-3 pt-1">
             {resetToast === 'success' && (
               <span className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
@@ -292,7 +286,7 @@ export default function LoginSecuritySettings() {
         ) : (
           <div className="space-y-2">
             {sessions.map((s, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:border-slate-200 transition">
+              <div key={s.id ?? i} className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:border-slate-200 transition group">
                 <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
                   <Monitor size={14} className="text-slate-500" />
                 </div>
@@ -305,6 +299,13 @@ export default function LoginSecuritySettings() {
                     {s.ip === '::1' ? 'Localhost' : s.ip ?? 'Unknown IP'} · {formatUserAgent(s.user_agent)} · {formatDate(s.created_at)}
                   </p>
                 </div>
+                <button
+                  onClick={() => handleDeleteSession(s.id)}
+                  className="opacity-0 group-hover:opacity-100 transition p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-400 flex-shrink-0"
+                  title="Delete this entry"
+                >
+                  <Trash2 size={13} />
+                </button>
                 {i === 0 && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 flex-shrink-0">
                     Latest

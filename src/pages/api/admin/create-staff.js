@@ -5,7 +5,7 @@ import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const requester = getAdminFromCookie(req)
+  const requester = await getAdminFromCookie(req)
   if (!requester || !['superadmin', 'admin'].includes(requester.role)) {
     return res.status(403).json({ message: 'Not authorized.' })
   }
@@ -17,7 +17,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Removed created_by filter — was causing mismatch
     const rows = await sql`
       SELECT * FROM staff_confirmation_codes
       WHERE code = ${code}
@@ -32,20 +31,17 @@ export default async function handler(req, res) {
 
     const record = rows[0]
 
+    let payload = typeof record.payload === 'string'
+      ? JSON.parse(record.payload)
+      : record.payload
 
+    if (typeof payload === 'string') {
+      payload = JSON.parse(payload)
+    }
 
-// Parse once
-      let payload = typeof record.payload === 'string'
-        ? JSON.parse(record.payload)
-        : record.payload
+    const { first_name, last_name, username, password, role } = payload
 
-      if (typeof payload === 'string') {
-        payload = JSON.parse(payload)
-      }
-
-      const { first_name, last_name, username, password, role } = payload
-
-      console.log('[create-staff] parsed payload:', payload)
+    console.log('[create-staff] parsed payload:', payload)
 
     if (!first_name || !last_name || !username || !password || !role) {
       return res.status(400).json({ message: 'Payload incomplete. Please go back and try again.' })
@@ -74,7 +70,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('[create-staff error]', err)
-    // ✅ Shows real error in modal instead of generic "Server error."
     return res.status(500).json({ message: err.message })
   }
 }

@@ -1,13 +1,21 @@
-// src/pages/api/categories/create.js
 import { sql } from '../../../lib/db'
+import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed.' })
+
+  const admin = await getAdminFromCookie(req)
+  if (!admin || !['superadmin', 'admin'].includes(admin.role)) {
+    return res.status(403).json({ message: 'Not authorized.' })
+  }
+
   const { name, description, status } = req.body
   if (!name?.trim()) return res.status(400).json({ message: 'Category name is required.' })
+
   try {
     const existing = await sql`SELECT id FROM categories WHERE LOWER(name) = LOWER(${name})`
     if (existing.length > 0) return res.status(409).json({ message: 'A category with that name already exists.' })
+
     const result = await sql`
       INSERT INTO categories (name, description, status)
       VALUES (${name.trim()}, ${description || null}, ${status || 'active'})

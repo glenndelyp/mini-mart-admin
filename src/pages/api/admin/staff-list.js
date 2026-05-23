@@ -2,7 +2,7 @@ import { sql } from '../../../lib/db'
 import { getAdminFromCookie } from '../../../lib/getAdminFromCookie'
 
 export default async function handler(req, res) {
-  const requester = getAdminFromCookie(req)
+  const requester = await getAdminFromCookie(req)
   if (!requester || !['superadmin', 'admin'].includes(requester.role)) {
     return res.status(403).json({ message: 'Not authorized.' })
   }
