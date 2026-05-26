@@ -8,7 +8,8 @@ export default async function handler(req, res) {
   const { id } = req.query
 
   if (req.method === 'PATCH') {
-    const { status, notes } = req.body
+    const { status, notes, eta_minutes } = req.body
+
     const allowed = ['confirmed', 'in_transit', 'delivered', 'cancelled']
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: 'Invalid status.' })
@@ -16,10 +17,23 @@ export default async function handler(req, res) {
 
     try {
       const now = new Date()
+
+      // Build deadline for confirmed orders with ETA
+      const deadline =
+        status === 'confirmed' && eta_minutes && !isNaN(parseInt(eta_minutes))
+          ? new Date(now.getTime() + parseInt(eta_minutes) * 60 * 1000)
+          : null
+
       const extra =
-        status === 'confirmed' ? sql`, confirmed_at = ${now}` :
-        status === 'delivered' ? sql`, delivered_at = ${now}` :
-        sql``
+        status === 'confirmed'
+          ? deadline
+            ? sql`, confirmed_at = ${now}, delivery_deadline = ${deadline}`
+            : sql`, confirmed_at = ${now}`
+          : status === 'delivered'
+          ? sql`, delivered_at = ${now}`
+          : status === 'cancelled'
+          ? sql`, cancelled_at = ${now}`
+          : sql``
 
       const [order] = await sql`
         UPDATE orders
@@ -37,13 +51,14 @@ export default async function handler(req, res) {
       const items = await sql`
         SELECT * FROM order_items WHERE order_id = ${id} ORDER BY id ASC
       `
+
       return res.status(200).json({
         order: {
           ...order,
           customer_name:  user?.customer_name  ?? '',
           customer_email: user?.customer_email ?? '',
           items,
-        }
+        },
       })
     } catch (err) {
       console.error('[orders/[id] PATCH error]', err)
@@ -52,7 +67,6 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    // Only superadmin can delete orders
     if (admin.role !== 'superadmin') {
       return res.status(403).json({ message: 'Only superadmin can delete orders.' })
     }

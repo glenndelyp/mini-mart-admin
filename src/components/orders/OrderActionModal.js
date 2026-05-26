@@ -1,4 +1,3 @@
-// src/components/orders/OrderActionModal.js
 import { useState, useEffect } from 'react'
 import { X, CheckCircle, Truck, PackageCheck, XCircle, Clock, MapPin, ShoppingBag, Timer } from 'lucide-react'
 
@@ -13,6 +12,7 @@ const ACTION_META = {
     btnLabel:  'Confirm Order',
     btnBg:     '#2563eb',
     hasEta:    true,
+    status:    'confirmed',
   },
   transit: {
     icon:      Truck,
@@ -23,6 +23,7 @@ const ACTION_META = {
     btnLabel:  'Out for Delivery',
     btnBg:     '#7c3aed',
     hasEta:    false,
+    status:    'in_transit',
   },
   deliver: {
     icon:      PackageCheck,
@@ -33,6 +34,7 @@ const ACTION_META = {
     btnLabel:  'Mark Delivered',
     btnBg:     '#15803d',
     hasEta:    false,
+    status:    'delivered',
   },
   cancel: {
     icon:      XCircle,
@@ -43,23 +45,23 @@ const ACTION_META = {
     btnLabel:  'Yes, Cancel Order',
     btnBg:     '#dc2626',
     hasEta:    false,
+    status:    'cancelled',
   },
 }
 
 // ─── Quick-pick presets (minutes) ─────────────────────────────────────────────
 const PRESETS = [
-  { label: '15 min',  value: 15  },
-  { label: '30 min',  value: 30  },
-  { label: '45 min',  value: 45  },
-  { label: '1 hr',    value: 60  },
-  { label: '1.5 hr',  value: 90  },
-  { label: '2 hr',    value: 120 },
+  { label: '15 min', value: 15  },
+  { label: '30 min', value: 30  },
+  { label: '45 min', value: 45  },
+  { label: '1 hr',   value: 60  },
+  { label: '1.5 hr', value: 90  },
+  { label: '2 hr',   value: 120 },
 ]
 
 export default function OrderActionModal({ modal, onClose, onSuccess }) {
-  // etaMinutes = numeric minutes (the single source of truth)
   const [etaMinutes, setEtaMinutes] = useState('')
-  const [inputVal,   setInputVal]   = useState('')   // raw text in the number box
+  const [inputVal,   setInputVal]   = useState('')
   const [loading,    setLoading]    = useState(false)
   const [apiError,   setApiError]   = useState('')
 
@@ -77,7 +79,6 @@ export default function OrderActionModal({ modal, onClose, onSuccess }) {
 
   // ── Keep inputVal and etaMinutes in sync ──────────────────────────────────
   const handleInputChange = (raw) => {
-    // Only allow digits
     const digits = raw.replace(/\D/g, '')
     setInputVal(digits)
     const num = parseInt(digits, 10)
@@ -120,13 +121,13 @@ export default function OrderActionModal({ modal, onClose, onSuccess }) {
     setApiError('')
 
     try {
-      const res  = await fetch('/api/orders/update', {
-        method:  'PUT',
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          id:          order.id,
-          action:      type,
-          eta_minutes: meta?.hasEta ? parseInt(etaMinutes, 10) : undefined,
+        body: JSON.stringify({
+          status:      meta.status,
+          notes:       undefined,
+          ...(meta?.hasEta && { eta_minutes: parseInt(etaMinutes, 10) }),
         }),
       })
       const data = await res.json()
@@ -154,8 +155,10 @@ export default function OrderActionModal({ modal, onClose, onSuccess }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: meta.iconBg }}>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: meta.iconBg }}
+            >
               <Icon size={20} style={{ color: meta.iconColor }} />
             </div>
             <div>
@@ -260,7 +263,8 @@ export default function OrderActionModal({ modal, onClose, onSuccess }) {
                   ${apiError
                     ? 'border-red-300 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-100'
                     : 'border-slate-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-50'
-                  }`}>
+                  }`}
+                >
                   <Timer size={15} className="text-slate-400 flex-shrink-0" />
                   <input
                     type="text"
