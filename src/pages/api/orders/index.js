@@ -13,7 +13,9 @@ export default async function handler(req, res) {
         o.id, o.user_id, o.status, o.total_amount, o.delivery_address,
         o.notes, o.estimated_delivery, o.created_at, o.confirmed_at, o.delivered_at,
         u.first_name || ' ' || u.last_name AS customer_name,
-        u.email AS customer_email
+        u.email AS customer_email,
+        u.phone AS customer_phone,
+        u.address AS customer_address
       FROM orders o
       LEFT JOIN users u ON u.id = o.user_id
       ORDER BY o.created_at DESC

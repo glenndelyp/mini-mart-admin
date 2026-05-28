@@ -18,7 +18,6 @@ export default async function handler(req, res) {
     try {
       const now = new Date()
 
-      // Build deadline for confirmed orders with ETA
       const deadline =
         status === 'confirmed' && eta_minutes && !isNaN(parseInt(eta_minutes))
           ? new Date(now.getTime() + parseInt(eta_minutes) * 60 * 1000)
@@ -45,7 +44,9 @@ export default async function handler(req, res) {
 
       const [user] = await sql`
         SELECT first_name || ' ' || last_name AS customer_name,
-               email AS customer_email
+               email AS customer_email,
+               phone AS customer_phone,
+               address AS customer_address
         FROM users WHERE id = ${order.user_id}
       `
       const items = await sql`
@@ -55,8 +56,10 @@ export default async function handler(req, res) {
       return res.status(200).json({
         order: {
           ...order,
-          customer_name:  user?.customer_name  ?? '',
-          customer_email: user?.customer_email ?? '',
+          customer_name:    user?.customer_name    ?? '',
+          customer_email:   user?.customer_email   ?? '',
+          customer_phone:   user?.customer_phone   ?? null,
+          customer_address: user?.customer_address ?? null,
           items,
         },
       })
